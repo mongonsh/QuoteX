@@ -1,0 +1,22 @@
+{
+  "name": "quotepilot-qwen-hack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Qwen-powered cross-border RFQ autopilot hackathon demo.",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "find:qwen-model": "node tools/find-qwen-model.mjs",
+    "probe:qwen-image": "node tools/probe-qwen-image.mjs",
+    "probe:qwen": "node tools/probe-qwen.mjs",
+    "test": "node tests/run-tests.mjs"
+  },
+  "keywords": [
+    "qwen",
+    "hackathon",
+    "autopilot-agent",
+    "memory-agent",
+    "rfq"
+  ],
+  "license": "UNLICENSED"
+}

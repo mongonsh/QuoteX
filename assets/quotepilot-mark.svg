@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">QuotePilot mark</title>
+  <rect x="6" y="8" width="52" height="48" rx="12" fill="#0F766E"/>
+  <path d="M19 22H45" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <path d="M19 32H37" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <path d="M19 42H31" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <path d="M42 39L49 32L42 25" stroke="#FBBF24" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
