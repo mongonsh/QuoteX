@@ -1,23 +1,32 @@
-import { createServer } from "node:http";
-import { extname, join, normalize, resolve } from "node:path";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import { readFile } from "node:fs/promises";
 import { customers, products } from "../src/data.js";
-import { loadConfig } from "../server/config.mjs";
-import { generateMarketingAsset } from "../server/marketing-asset.mjs";
-import { parseRfqWithQwen } from "../server/qwen-parser.mjs";
+import { loadConfig } from "../server/config.js";
+import { generateMarketingAsset } from "../server/marketing-asset.js";
+import { parseRfqWithQwen } from "../server/qwen-parser.js";
 
 const root = resolve(process.cwd());
 const port = Number(process.env.PORT || 4173);
+const host = process.env.HOST || "0.0.0.0";
 const config = await loadConfig();
 const MAX_JSON_BODY_BYTES = 7_000_000;
 
-const mimeTypes = {
+const mimeTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml; charset=utf-8"
+};
+const securityHeaders = {
+  "Content-Security-Policy":
+    "default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Permissions-Policy": "camera=(), geolocation=(), microphone=(self)"
 };
 
 const server = createServer(async (request, response) => {
@@ -47,9 +56,10 @@ const server = createServer(async (request, response) => {
 
         sendJson(response, 200, result);
       } catch (error) {
-        sendJson(response, error.status || 502, {
+        const failure = toStatusError(error);
+        sendJson(response, failure.status || 502, {
           ok: false,
-          error: error.message || "Marketing asset generation failed",
+          error: failure.message || "Marketing asset generation failed",
           trace: {
             status: "error",
             model: config.qwen.marketingModel,
@@ -65,7 +75,8 @@ const server = createServer(async (request, response) => {
         const payload = await readJsonRequest(request);
         const customer =
           payload.customer ||
-          customers.find((candidate) => candidate.id === payload.rfq?.customerId);
+          customers.find((candidate) => candidate.id === payload.rfq?.customerId) ||
+          customers[0]!;
         const result = await parseRfqWithQwen({
           config,
           payload: {
@@ -77,9 +88,10 @@ const server = createServer(async (request, response) => {
 
         sendJson(response, 200, result);
       } catch (error) {
+        const failure = toStatusError(error);
         sendJson(response, 200, {
           ok: false,
-          error: error.message || "Qwen parser failed",
+          error: failure.message || "Qwen parser failed",
           trace: {
             status: "error",
             model: config.qwen.model,
@@ -93,26 +105,35 @@ const server = createServer(async (request, response) => {
     const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
     const filePath = resolve(join(root, normalize(pathname)));
 
-    if (!filePath.startsWith(root)) {
-      response.writeHead(403);
+    if (filePath !== root && !filePath.startsWith(`${root}${sep}`)) {
+      response.writeHead(403, securityHeaders);
       response.end("Forbidden");
       return;
     }
 
     const body = await readFile(filePath);
     response.writeHead(200, {
+      ...securityHeaders,
       "Content-Type": mimeTypes[extname(filePath)] || "application/octet-stream",
       "Cache-Control": "no-store"
     });
     response.end(body);
   } catch {
-    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    response.writeHead(404, {
+      ...securityHeaders,
+      "Content-Type": "text/plain; charset=utf-8"
+    });
     response.end("Not found");
   }
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`QuotePilot running at http://127.0.0.1:${port}`);
+// Function Compute custom containers require long-lived keep-alive support.
+server.requestTimeout = 0;
+server.keepAliveTimeout = 0;
+server.headersTimeout = 0;
+
+server.listen(port, host, () => {
+  console.log(`QuoteX running at http://${host}:${port}`);
   console.log(
     `Qwen ${config.qwen.apiKey ? "configured" : "not configured"}: ${config.qwen.model} via ${safeHost(
       config.qwen.baseUrl
@@ -120,15 +141,23 @@ server.listen(port, "127.0.0.1", () => {
   );
 });
 
-async function readJsonRequest(request) {
-  const chunks = [];
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    server.close(() => process.exit(0));
+  });
+}
+
+async function readJsonRequest(request: IncomingMessage): Promise<Record<string, any>> {
+  const chunks: Buffer[] = [];
   let totalBytes = 0;
 
   for await (const chunk of request) {
     totalBytes += chunk.length;
 
     if (totalBytes > MAX_JSON_BODY_BYTES) {
-      const error = new Error("Request payload is too large. Upload an image under 5 MB.");
+      const error = new Error(
+        "Request payload is too large. Upload an image under 5 MB."
+      ) as Error & { status: number };
       error.status = 413;
       throw error;
     }
@@ -141,18 +170,25 @@ async function readJsonRequest(request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-function sendJson(response, status, payload) {
+function sendJson(response: ServerResponse, status: number, payload: unknown): void {
   response.writeHead(status, {
+    ...securityHeaders,
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store"
   });
   response.end(JSON.stringify(payload));
 }
 
-function safeHost(baseUrl) {
+function safeHost(baseUrl: string): string {
   try {
     return new URL(baseUrl).host;
   } catch {
     return "unknown";
   }
+}
+
+function toStatusError(value: unknown): Error & { status?: number } {
+  return value instanceof Error
+    ? (value as Error & { status?: number })
+    : Object.assign(new Error(String(value)), { status: undefined });
 }

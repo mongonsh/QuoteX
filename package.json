@@ -1,15 +1,18 @@
 {
-  "name": "quotepilot-qwen-hack",
-  "version": "0.1.0",
+  "name": "quotex-qwen-autopilot",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Qwen-powered cross-border RFQ autopilot hackathon demo.",
   "scripts": {
-    "dev": "node tools/serve.mjs",
-    "find:qwen-model": "node tools/find-qwen-model.mjs",
-    "probe:qwen-image": "node tools/probe-qwen-image.mjs",
-    "probe:qwen": "node tools/probe-qwen.mjs",
-    "test": "node tests/run-tests.mjs"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "npm run build && node dist/tools/serve.js",
+    "start": "npm run build && node dist/tools/serve.js",
+    "find:qwen-model": "npm run build && node dist/tools/find-qwen-model.js",
+    "probe:qwen-image": "npm run build && node dist/tools/probe-qwen-image.js",
+    "probe:qwen": "npm run build && node dist/tools/probe-qwen.js",
+    "test": "npm run build && node dist/tests/run-tests.js"
   },
   "keywords": [
     "qwen",
@@ -18,5 +21,12 @@
     "memory-agent",
     "rfq"
   ],
-  "license": "UNLICENSED"
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
 }

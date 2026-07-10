@@ -1,4 +1,5 @@
-import { loadConfig } from "../server/config.mjs";
+import { loadConfig } from "../server/config.js";
+import type { AppConfig } from "../src/types.js";
 
 const config = await loadConfig();
 const endpoints = [
@@ -18,7 +19,13 @@ if (!config.qwen.apiKey) {
   }
 }
 
-async function probeEndpoint({ baseUrl, config }) {
+async function probeEndpoint({
+  baseUrl,
+  config
+}: {
+  baseUrl: string;
+  config: AppConfig;
+}): Promise<Record<string, unknown>> {
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
@@ -49,12 +56,12 @@ async function probeEndpoint({ baseUrl, config }) {
     return {
       host: safeHost(baseUrl),
       model: config.qwen.model,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 }
 
-function extractMessage(body) {
+function extractMessage(body: string): string {
   try {
     const json = JSON.parse(body);
     return (
@@ -68,7 +75,7 @@ function extractMessage(body) {
   }
 }
 
-function safeHost(baseUrl) {
+function safeHost(baseUrl: string): string {
   try {
     return new URL(baseUrl).host;
   } catch {

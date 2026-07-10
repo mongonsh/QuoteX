@@ -1,4 +1,4 @@
-import { loadConfig } from "../server/config.mjs";
+import { loadConfig } from "../server/config.js";
 
 const config = await loadConfig();
 const candidates = [
@@ -39,7 +39,7 @@ if (!config.qwen.apiKey) {
   }
 }
 
-async function probeModel(model) {
+async function probeModel(model: string): Promise<Record<string, unknown>> {
   try {
     const response = await fetch(`${config.qwen.baseUrl}/chat/completions`, {
       method: "POST",
@@ -64,12 +64,12 @@ async function probeModel(model) {
   } catch (error) {
     return {
       model,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 }
 
-function extractMessage(body) {
+function extractMessage(body: string): string {
   try {
     const json = JSON.parse(body);
     return (

@@ -1,4 +1,6 @@
-export const customers = [
+import type { Customer, PricingRules, Product, RfqScenario, ShippingOption } from "./types.js";
+
+export const customers: Customer[] = [
   {
     id: "mori-lighting",
     company: "Mori Lighting Co.",
@@ -77,7 +79,7 @@ export const customers = [
   }
 ];
 
-export const products = [
+export const products: Product[] = [
   {
     sku: "AUR-CTRL-24",
     name: "Aurora 24V LED Control Board",
@@ -136,7 +138,7 @@ export const products = [
   }
 ];
 
-export const shippingOptions = [
+export const shippingOptions: ShippingOption[] = [
   {
     id: "dhl-cn-jp",
     route: "Shenzhen -> Yokohama",
@@ -199,7 +201,7 @@ export const shippingOptions = [
   }
 ];
 
-export const rfqScenarios = [
+export const rfqScenarios: RfqScenario[] = [
   {
     id: "mori-repeat-500",
     customerId: "mori-lighting",
@@ -212,6 +214,20 @@ export const rfqScenarios = [
     destination: "Yokohama warehouse",
     deadlineDays: 7,
     priority: "High"
+  },
+  {
+    id: "mori-memory-replay",
+    customerId: "mori-lighting",
+    receivedAt: "2026-07-08T08:45:00+09:00",
+    channel: "Email",
+    subject: "前回と同じ条件で追加800個",
+    rawMessage:
+      "田中です。前回承認したAurora基板を追加で800個お願いします。同じ支払い条件と配送判断で、横浜倉庫へ10日以内に届く見積をください。",
+    expectedQuantity: 800,
+    destination: "Yokohama warehouse",
+    deadlineDays: 10,
+    priority: "High",
+    demoLabel: "Memory replay"
   },
   {
     id: "northstar-ambiguous",
@@ -241,7 +257,7 @@ export const rfqScenarios = [
   }
 ];
 
-export const pricingRules = {
+export const pricingRules: PricingRules = {
   targetMargin: 0.32,
   floorMargin: 0.24,
   repeatBuyerDiscount: 0.03,

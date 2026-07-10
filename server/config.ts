@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
+import type { AppConfig } from "../src/types.js";
 
 const DEFAULT_QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 
-export async function loadConfig() {
+export async function loadConfig(): Promise<AppConfig> {
   const fileEnv = await readDotEnv(".env");
   const env = { ...fileEnv, ...process.env };
   const baseUrl = buildQwenBaseUrl(env);
@@ -28,7 +29,7 @@ export async function loadConfig() {
   };
 }
 
-async function readDotEnv(path) {
+async function readDotEnv(path: string): Promise<Record<string, string>> {
   try {
     const text = await readFile(path, "utf8");
 
@@ -51,7 +52,7 @@ async function readDotEnv(path) {
   }
 }
 
-function buildQwenBaseUrl(env) {
+function buildQwenBaseUrl(env: NodeJS.ProcessEnv): string {
   if (env.QWEN_BASE_URL) return stripTrailingSlash(env.QWEN_BASE_URL);
   if (env.QWEN_API_BASE_URL) return stripTrailingSlash(env.QWEN_API_BASE_URL);
   if (env.DASHSCOPE_BASE_URL) return stripTrailingSlash(env.DASHSCOPE_BASE_URL);
@@ -64,7 +65,7 @@ function buildQwenBaseUrl(env) {
   return DEFAULT_QWEN_BASE_URL;
 }
 
-function buildQwenImageBaseUrl(env, baseUrl) {
+function buildQwenImageBaseUrl(env: NodeJS.ProcessEnv, baseUrl: string): string {
   if (env.QWEN_IMAGE_BASE_URL) return stripTrailingSlash(env.QWEN_IMAGE_BASE_URL);
   if (env.DASHSCOPE_IMAGE_BASE_URL) return stripTrailingSlash(env.DASHSCOPE_IMAGE_BASE_URL);
   if (env.QWEN_DASHSCOPE_URL) return stripTrailingSlash(env.QWEN_DASHSCOPE_URL);
@@ -81,6 +82,6 @@ function buildQwenImageBaseUrl(env, baseUrl) {
   }
 }
 
-function stripTrailingSlash(value) {
+function stripTrailingSlash(value: string): string {
   return String(value).replace(/\/+$/, "");
 }

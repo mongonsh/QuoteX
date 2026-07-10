@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { customers, products, rfqScenarios } from "../src/data.js";
-import { generateMarketingAsset } from "../server/marketing-asset.mjs";
+import { generateMarketingAsset } from "../server/marketing-asset.js";
 
 const result = await generateMarketingAsset({
   config: {
     qwen: {
       apiKey: "",
+      imageApiKey: "",
       baseUrl: "https://example.test/compatible-mode/v1",
+      model: "qwen3.6-flash",
       marketingModel: "qwen3.6-flash",
+      imageModel: "qwen-image-2.0-pro",
+      imageEndpoint: "https://example.test/api/v1/image",
       timeoutMs: 100
     }
   },
@@ -44,14 +48,15 @@ assert.match(svg, /<image href="data:image\/png;base64,/);
 assert.match(svg, /AI edited preview/);
 
 const originalFetch = globalThis.fetch;
-let imageEditBody = null;
-let chatAuthorization = null;
-let imageAuthorization = null;
+let imageEditBody: any = null;
+let chatAuthorization: string | null = null;
+let imageAuthorization: string | null = null;
 globalThis.fetch = async (url, options) => {
-  const body = JSON.parse(options.body);
+  const body = JSON.parse(String(options?.body));
+  const authorization = new Headers(options?.headers).get("Authorization");
 
   if (String(url).includes("/chat/completions")) {
-    chatAuthorization = options.headers.Authorization;
+    chatAuthorization = authorization;
 
     return new Response(
       JSON.stringify({
@@ -85,7 +90,7 @@ globalThis.fetch = async (url, options) => {
   }
 
   imageEditBody = body;
-  imageAuthorization = options.headers.Authorization;
+  imageAuthorization = authorization;
 
   return new Response(
     JSON.stringify({
@@ -121,6 +126,7 @@ try {
         apiKey: "sk-text-test",
         imageApiKey: "sk-image-test",
         baseUrl: "https://example.test/compatible-mode/v1",
+        model: "qwen3.6-flash",
         marketingModel: "qwen3.6-flash",
         imageModel: "qwen-image-2.0-pro",
         imageEndpoint:

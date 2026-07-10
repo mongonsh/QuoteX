@@ -1,4 +1,4 @@
-import { loadConfig } from "../server/config.mjs";
+import { loadConfig } from "../server/config.js";
 
 const DOC_URL = "https://www.alibabacloud.com/help/en/model-studio/qwen-image-edit-api";
 const config = await loadConfig();
@@ -83,14 +83,14 @@ async function probeImageEdit() {
       model,
       endpointHost: safeHost(endpoint),
       endpointPath: safePath(endpoint),
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       hint:
         "Could not reach the configured image endpoint. Check QWEN_IMAGE_BASE_URL, network access, and the workspace region."
     };
   }
 }
 
-function makeBmpDataUrl(width, height) {
+function makeBmpDataUrl(width: number, height: number): string {
   const rowSize = Math.ceil((width * 3) / 4) * 4;
   const pixelBytes = rowSize * height;
   const offset = 54;
@@ -128,7 +128,7 @@ function makeBmpDataUrl(width, height) {
   return `data:image/bmp;base64,${buffer.toString("base64")}`;
 }
 
-function hintFor(status, message) {
+function hintFor(status: number, message: unknown): string {
   const text = String(message || "");
 
   if (/model not exist|model.*not.*found|no such model/i.test(text)) {
@@ -159,11 +159,15 @@ function hintFor(status, message) {
   return "Check the provider message, image model, endpoint region, and workspace permissions.";
 }
 
-function extractImageUrl(data) {
-  return data?.output?.choices?.[0]?.message?.content?.find((item) => item.image)?.image || "";
+function extractImageUrl(data: any): string {
+  return (
+    data?.output?.choices?.[0]?.message?.content?.find(
+      (item: { image?: string }) => item.image
+    )?.image || ""
+  );
 }
 
-function extractMessage(data, body) {
+function extractMessage(data: any, body: string): string {
   return (
     data?.error?.message ||
     data?.message ||
@@ -172,7 +176,7 @@ function extractMessage(data, body) {
   );
 }
 
-function parseJson(body) {
+function parseJson(body: string): any {
   try {
     return JSON.parse(body);
   } catch {
@@ -180,7 +184,7 @@ function parseJson(body) {
   }
 }
 
-function safeHost(value) {
+function safeHost(value: string): string {
   try {
     return new URL(value).host;
   } catch {
@@ -188,7 +192,7 @@ function safeHost(value) {
   }
 }
 
-function safePath(value) {
+function safePath(value: string): string {
   try {
     return new URL(value).pathname;
   } catch {

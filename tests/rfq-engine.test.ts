@@ -10,8 +10,8 @@ import {
 } from "../src/rfq-engine.js";
 import { customers, products } from "../src/data.js";
 
-const moriRfq = rfqScenarios.find((rfq) => rfq.id === "mori-repeat-500");
-const moriCustomer = customers.find((customer) => customer.id === "mori-lighting");
+const moriRfq = rfqScenarios.find((rfq) => rfq.id === "mori-repeat-500")!;
+const moriCustomer = customers.find((customer) => customer.id === "mori-lighting")!;
 
 assert.equal(parseRfqDeterministically(moriRfq).quantity, 500);
 assert.equal(parseRfqDeterministically(moriRfq).language, "Japanese");
@@ -29,10 +29,29 @@ assert.equal(analysis.quote.sku, "AUR-CTRL-24");
 assert.equal(analysis.shipping.carrier, "DHL Express");
 assert.equal(analysis.approval.status, "pending");
 assert.ok(analysis.timeline.length >= 5);
+assert.ok(analysis.memoryImpact.factsApplied >= 2);
+assert.ok(analysis.memoryImpact.goodsSavingsUsd > 0);
+assert.ok(analysis.memoryImpact.routingConfidenceLift > 0);
+assert.equal(analysis.executionProof.policyChecks, 6);
+assert.equal(analysis.executionProof.humanDecisions, 1);
+assert.equal(analysis.executionProof.qwenStatus, "Guarded fallback");
 
 const approved = approveQuote(analysis);
 assert.equal(approved.approval.status, "approved");
-assert.equal(approved.memoryWrite.type, "approval_outcome");
+assert.equal(approved.memoryWrite!.type, "approval_outcome");
+assert.equal(approved.memoryWrite!.sku, "AUR-CTRL-24");
+assert.equal(approved.timeline.at(-1)!.executionType, "memory-write");
+
+const replayRfq = rfqScenarios.find((rfq) => rfq.id === "mori-memory-replay")!;
+const replayAnalysis = await runAutopilot(replayRfq, {
+  customer: {
+    ...moriCustomer,
+    memory: [approved.memoryWrite!, ...moriCustomer.memory]
+  }
+});
+assert.equal(replayAnalysis.quote.quantity, 800);
+assert.ok(replayAnalysis.relevantMemories.some((memory) => memory.type === "approval_outcome"));
+assert.ok(replayAnalysis.quote.discount > analysis.quote.discount);
 
 const realWorldRfq = {
   ...moriRfq,
