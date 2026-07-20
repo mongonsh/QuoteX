@@ -14,6 +14,11 @@ import { guideSellerIntakeWithQwen } from "../server/seller-intake-agent.js";
 import { contentTypeForPath } from "../server/static-content.js";
 import { createPersistence } from "../server/persistence.js";
 import {
+  buildCorsHeaders,
+  isCorsOriginAllowed,
+  parseCorsOrigins
+} from "../server/cors.js";
+import {
   getDesignedVoiceStatus,
   synthesizeSpeech
 } from "../server/qwen-tts.js";
@@ -28,6 +33,7 @@ const host = process.env.HOST || "0.0.0.0";
 const [config, environment] = await Promise.all([loadConfig(), loadEnvironment()]);
 const accessToken = cleanAccessToken(environment.QUOTEX_ACCESS_TOKEN);
 const accessCookie = accessToken ? accessTokenDigest(accessToken) : "";
+const allowedCorsOrigins = parseCorsOrigins(environment.QUOTEX_CORS_ORIGINS);
 const persistence = await createPersistence({ config, root });
 const { listingStore, agentRunStore } = persistence;
 const MAX_JSON_BODY_BYTES = 10_500_000;
@@ -63,6 +69,21 @@ const server = createServer(async (request, response) => {
 
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host}`);
+    const requestOrigin = headerText(request, "origin");
+    const corsHeaders = buildCorsHeaders(requestOrigin, allowedCorsOrigins);
+    for (const [name, value] of Object.entries(corsHeaders)) {
+      response.setHeader(name, value);
+    }
+
+    if (request.method === "OPTIONS" && url.pathname.startsWith("/api/")) {
+      if (requestOrigin && !isCorsOriginAllowed(requestOrigin, allowedCorsOrigins)) {
+        sendJson(response, 403, { ok: false, error: "Browser origin is not allowed." });
+        return;
+      }
+      response.writeHead(204, securityHeaders);
+      response.end();
+      return;
+    }
 
     if (
       accessToken &&

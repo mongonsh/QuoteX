@@ -15,6 +15,7 @@ import {
   type MarketplaceDraft
 } from "./marketplace-adapters.js";
 import { getQwenMode, setQwenMode } from "./qwen-client.js";
+import { apiFetch } from "./api-client.js";
 import { approveQuote, formatUsd, runAutopilot } from "./rfq-engine.js";
 import type {
   Analysis,
@@ -847,7 +848,9 @@ async function runSelectedRfq(): Promise<void> {
 
 async function bootstrapServiceHealth(): Promise<void> {
   try {
-    const response = await fetch("/api/health", { headers: { Accept: "application/json" } });
+    const response = await apiFetch("/api/health", {
+      headers: { Accept: "application/json" }
+    });
     if (!response.ok) throw new Error("Health endpoint unavailable");
     const payload = (await response.json()) as {
       qwen?: {
@@ -916,7 +919,7 @@ async function bootstrapServiceHealth(): Promise<void> {
 
 async function bootstrapListings(): Promise<void> {
   try {
-    const response = await fetch("/api/listings", {
+    const response = await apiFetch("/api/listings", {
       headers: { Accept: "application/json" }
     });
     const payload = (await response.json()) as ListingApiResponse;
@@ -1012,7 +1015,7 @@ async function sendSellerIntakeMessage(rawMessage: string): Promise<void> {
   render();
 
   try {
-    const response = await fetch("/api/seller-intake-assistant", {
+    const response = await apiFetch("/api/seller-intake-assistant", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1164,7 +1167,7 @@ async function saveSellerListing(): Promise<void> {
   render();
 
   try {
-    const response = await fetch("/api/listings", {
+    const response = await apiFetch("/api/listings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input)
@@ -1202,7 +1205,7 @@ async function deleteSellerListing(listing: SellerListing): Promise<void> {
   if (!confirmed) return;
 
   try {
-    const response = await fetch(`/api/listings/${encodeURIComponent(listing.id)}`, {
+    const response = await apiFetch(`/api/listings/${encodeURIComponent(listing.id)}`, {
       method: "DELETE",
       headers: { Accept: "application/json" }
     });
@@ -1234,7 +1237,9 @@ async function handleSellerPhoto(file: File | undefined): Promise<void> {
 }
 
 async function loadListingMedia(listing: SellerListing): Promise<UploadedMedia> {
-  const response = await fetch(listing.photo.url, { headers: { Accept: listing.photo.mimeType } });
+  const response = await apiFetch(listing.photo.url, {
+    headers: { Accept: listing.photo.mimeType }
+  });
   if (!response.ok) throw new Error(`Photo service returned ${response.status}`);
   const blob = await response.blob();
 
@@ -1267,7 +1272,7 @@ async function generateMarketingCreative(): Promise<void> {
     const rfq = getSelectedRfq();
     const customer = getCustomer(rfq.customerId);
     const selectedProduct = state.analysis.selectedProduct.product || products[0];
-    const response = await fetch("/api/generate-marketing-asset", {
+    const response = await apiFetch("/api/generate-marketing-asset", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1328,7 +1333,7 @@ async function generateProductVideo(): Promise<void> {
   render();
 
   try {
-    const response = await fetch("/api/product-video", {
+    const response = await apiFetch("/api/product-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ media: firstFrame, prompt, resolution, duration })
@@ -1351,7 +1356,7 @@ async function generateProductVideo(): Promise<void> {
       await wait(15_000);
       if (generationRevision !== activeVideoGenerationRevision) return;
 
-      const statusResponse = await fetch(
+      const statusResponse = await apiFetch(
         `/api/product-video-status?taskId=${encodeURIComponent(state.productVideo.taskId)}`,
         { headers: { Accept: "application/json" } }
       );
@@ -1627,7 +1632,7 @@ async function transcribeRecordedAudio(
   render();
 
   try {
-    const response = await fetch("/api/transcribe-audio", {
+    const response = await apiFetch("/api/transcribe-audio", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1834,7 +1839,7 @@ async function sendCustomerAgentMessage(rawMessage: string): Promise<void> {
   try {
     const rfq = getSelectedRfq();
     const customer = getCustomer(rfq.customerId);
-    const response = await fetch("/api/customer-agent", {
+    const response = await apiFetch("/api/customer-agent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1899,7 +1904,7 @@ async function synthesizeAgentMessage(
   if (!message || message.role !== "assistant") return;
 
   try {
-    const response = await fetch("/api/synthesize-speech", {
+    const response = await apiFetch("/api/synthesize-speech", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: message.content, language })

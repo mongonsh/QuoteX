@@ -89,6 +89,8 @@ export function buildAlibabaFcDeploymentPlan({
     PORT: "9000",
     QUOTEX_DB_PATH: text(env.ALIBABA_FC_DB_PATH) || "/tmp/quotex.sqlite",
     QUOTEX_ACCESS_TOKEN: accessToken,
+    QUOTEX_CORS_ORIGINS:
+      text(env.QUOTEX_CORS_ORIGINS) || "https://mongonsh.github.io",
     QWEN_VOICE_CACHE_PATH: "/tmp/qwen-voice-profile.json",
     ...qwenEnvironment,
     ...storageEnvironment

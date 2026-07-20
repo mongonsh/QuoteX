@@ -8,6 +8,7 @@ import type {
   QwenTrace,
   RfqScenario
 } from "./types.js";
+import { apiFetch } from "./api-client.js";
 
 const DEFAULT_MODE: QwenMode = "qwen-live";
 const DEMO_MODE = "deterministic-demo";
@@ -82,7 +83,7 @@ export async function parseRfqWithQwen(
   }
 
   try {
-    const response = await fetch("/api/run-agent", {
+    const response = await apiFetch("/api/run-agent", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

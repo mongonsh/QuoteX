@@ -6,6 +6,7 @@
   "description": "Qwen-powered cross-border RFQ autopilot hackathon demo.",
   "scripts": {
     "build": "tsc",
+    "build:pages": "npm run build && node tools/build-pages-artifact.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "npm run build && node dist/tools/serve.js",
     "start": "npm run build && node dist/tools/serve.js",
