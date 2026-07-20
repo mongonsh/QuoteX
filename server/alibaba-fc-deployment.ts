@@ -91,6 +91,8 @@ export function buildAlibabaFcDeploymentPlan({
     QUOTEX_ACCESS_TOKEN: accessToken,
     QUOTEX_CORS_ORIGINS:
       text(env.QUOTEX_CORS_ORIGINS) || "https://mongonsh.github.io",
+    QUOTEX_PUBLIC_APP_URL:
+      text(env.QUOTEX_PUBLIC_APP_URL) || "https://mongonsh.github.io/QuoteX/",
     QWEN_VOICE_CACHE_PATH: "/tmp/qwen-voice-profile.json",
     ...qwenEnvironment,
     ...storageEnvironment

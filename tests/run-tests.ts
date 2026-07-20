@@ -4,6 +4,7 @@ await import("./marketplace-adapters.test.js");
 await import("./static-content.test.js");
 await import("./api-client.test.js");
 await import("./cors.test.js");
+await import("./public-app.test.js");
 await import("./qwen-parser.test.js");
 await import("./qwen-tool-orchestrator.test.js");
 await import("./agent-evaluation.test.js");
