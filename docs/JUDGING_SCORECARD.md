@@ -48,7 +48,7 @@ This document maps the implementation directly to the published judging rubric. 
 | Is architecture clear? | Diagram, tool contracts, request flow, persistence, failures, threat model, and API surface are documented | `docs/ARCHITECTURE.md`, `diagrams/` |
 | Is reproduction clear? | README includes model routing, environment contract, local setup, probes, tests, benchmark, and deployment path | `README.md` |
 | Is cloud proof repeatable? | Dry-run/apply commands provision managed storage and RAM, publish an immutable ACR image, and create or update FC and its trigger while redacting secrets | `npm run provision:plan`, `npm run image:plan`, `npm run deploy:plan` |
-| Is the backend actually deployed? | The public Function Compute health endpoint reports the FC runtime and configured Qwen services; sanitized evidence binds the endpoint and ZIP digest to the deployed commit | Live `/api/health`, `docs/alibaba-deployment-evidence.json` |
+| Is the backend actually deployed? | The public Function Compute health endpoint reports the FC runtime and configured Qwen services; a browser smoke test crosses the Pages-to-FC CORS boundary and completes a protected live Qwen run; sanitized evidence binds the endpoint and ZIP digest to the deployed commit | Live `/api/health`, `npm run verify:live-browser`, `docs/alibaba-deployment-evidence.json` |
 | Is it open source? | Root MIT license and package metadata are present | `LICENSE`, `package.json` |
 
 ## Measured evidence
@@ -80,4 +80,4 @@ The exact protocol and limitations are in `docs/EVALUATION.md`.
 - Confirm `https://github.com/mongonsh/QuoteX` is public and includes `server/alibaba-fc-deployment.ts`; use that public code URL as the required Alibaba Cloud API proof.
 - Replace the demo-video placeholder in `docs/DEVPOST_SUBMISSION.md`.
 
-The public Function Compute deployment is complete. Use the required code-file link plus `docs/alibaba-deployment-evidence.json` and the live health endpoint as additional runtime proof. A cloud-console recording is optional; never expose environment values or the private access token.
+The public Function Compute backend and browser-safe Pages client are complete. Use the required code-file link plus `docs/alibaba-deployment-evidence.json`, the live browser URL, and the health endpoint as additional runtime proof. A cloud-console recording is optional; never expose environment values or the private access token.

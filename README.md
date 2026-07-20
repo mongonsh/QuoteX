@@ -169,13 +169,17 @@ QuoteX has two executable Function Compute deployment paths:
 
 ### Verified live deployment
 
-- Application: [QuoteX on Alibaba Function Compute](https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run)
-- Public health: [`GET /api/health`](https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health)
+- Browser application: [Open QuoteX](https://mongonsh.github.io/QuoteX/)
+- Alibaba backend health: [`GET /api/health`](https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health)
+- Alibaba API base: `https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run`
 - Region and runtime: `ap-northeast-1`, `custom.debian10`, built-in Node.js 20
-- Deployed source: commit [`74b0470`](https://github.com/mongonsh/QuoteX/commit/74b04703946fd8dd317f5ead5388ac76f9127eea)
+- Deployed backend source: commit [`3c80dab`](https://github.com/mongonsh/QuoteX/commit/3c80dabeb46cfae8fc637426dafcedf366447e23)
+- Browser bridge source: commit [`4e2f960`](https://github.com/mongonsh/QuoteX/commit/4e2f96085cb55b98a279c6d631cd465855247157)
 - Machine-readable proof: [docs/alibaba-deployment-evidence.json](docs/alibaba-deployment-evidence.json)
 
-The public URL loads the interface and exposes health metadata. Live paid AI endpoints require the private judge link and return `401` without it. This judge deployment honestly reports `storage.provider: "memory"` and `durable: false`; the checked-in Tablestore, OSS, SLS, and RAM path is the durable production deployment.
+Open the GitHub Pages URL in a browser. Alibaba Cloud adds `Content-Disposition: attachment` to responses from its generated Function Compute domain, so that domain is intentionally used as the API backend rather than the browser entry point. The static browser client calls the same Function Compute deployment through a strict CORS allowlist. Live paid AI endpoints require the private judge fragment and return `401` without it; the fragment is removed from the address bar and retained only for the current browser session.
+
+The latest browser smoke test returned HTML without a download header, recorded zero console or network failures, reached Alibaba listings with `200`, and completed a live `qwen3.7-plus` run with all six skills and the human approval gate. This judge deployment honestly reports `storage.provider: "memory"` and `durable: false`; the checked-in Tablestore, OSS, SLS, and RAM path is the durable production deployment.
 
 Build and inspect the ACR-free request:
 
@@ -190,7 +194,7 @@ Set `ALIBABA_FC_DEPLOYMENT_MODE=code` and `QUOTEX_STORAGE_PROVIDER=memory` for t
 
 Devpost specifies a repository code-file link as the required Alibaba Cloud deployment proof. Use [server/alibaba-fc-deployment.ts](server/alibaba-fc-deployment.ts): it constructs and executes the official FC3 `CreateFunction`/`UpdateFunction` and HTTP-trigger requests. [server/alibaba-cloud-infrastructure.ts](server/alibaba-cloud-infrastructure.ts) provisions Tablestore, OSS, SLS, and RAM, while [server/qwen-tool-orchestrator.ts](server/qwen-tool-orchestrator.ts) shows the live Qwen Cloud runtime boundary. The separate [deployment evidence](docs/alibaba-deployment-evidence.json) binds the running endpoint and ZIP digest to the exact deployed commit.
 
-The code-proof requirement is distinct from additional runtime evidence. The Function Compute URL, artifact digest, health response, and authenticated Qwen smoke test were recorded only after the apply command succeeded. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the evidence contract and both reproducible deployment paths.
+The code-proof requirement is distinct from additional runtime evidence. The Function Compute API URL, artifact digest, health response, browser headers, CORS checks, and authenticated Qwen smoke test were recorded only after deployment succeeded. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the evidence contract and both reproducible deployment paths.
 
 ## Repository map
 

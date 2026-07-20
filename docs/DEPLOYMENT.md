@@ -25,26 +25,36 @@ A dry run proves request construction without changing cloud state. It is not pr
 
 ## Verified live deployment
 
-The ACR-free path is live in Alibaba Cloud Function Compute:
+The ACR-free backend is live in Alibaba Cloud Function Compute, with a browser-safe static client on GitHub Pages:
 
 ```text
-Application: https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run
-Health:      https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health
-Region:      ap-northeast-1 (Japan/Tokyo)
-Function:    quotex-autopilot
-Runtime:     custom.debian10 with the built-in Node.js 20 executable
-Source:      74b04703946fd8dd317f5ead5388ac76f9127eea
-ZIP SHA-256: 08ad736663b297ae69abc848c8f462dc61b2d33fe21a13e7eb052d965a748985
+Browser UI:     https://mongonsh.github.io/QuoteX/
+Alibaba API:    https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run
+Health:         https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health
+Region:         ap-northeast-1 (Japan/Tokyo)
+Function:       quotex-autopilot
+Runtime:        custom.debian10 with the built-in Node.js 20 executable
+Backend source: 3c80dabeb46cfae8fc637426dafcedf366447e23
+Browser source: 4e2f96085cb55b98a279c6d631cd465855247157
+ZIP SHA-256:    d1757303bd6eea89f4c20fc034b6a9e5950bee8f7c8ec6fcf5b38842720ced86
 ```
 
-At `2026-07-20T18:34:46.000Z`, verification returned:
+At `2026-07-20T19:10:03.000Z`, verification returned:
 
-- `200` from the application and public health endpoint;
+- `200` HTML from the browser URL with no `Content-Disposition` header;
+- zero browser console errors and zero failed resource requests;
+- `200` from the public Alibaba health endpoint;
+- `204` for the approved Pages CORS preflight and `403` for an unapproved origin;
 - `401` from a paid API without the private access token;
-- `200` from an authenticated `/api/parse-rfq` request;
-- live `qwen3.7-plus` provenance, quantity `500`, destination `Berlin distribution center`, confidence `0.98`, and 2,356 ms model latency.
+- `200` from authenticated Alibaba listing and agent APIs;
+- live `qwen3.7-plus` provenance from `dashscope-intl.aliyuncs.com`, two planner turns, six of six skills, a `human-review-required` gate, and 11,512 ms model latency;
+- removal of the private token from the URL before the application became interactive.
 
 The sanitized, machine-readable record is [alibaba-deployment-evidence.json](alibaba-deployment-evidence.json). The current public judge route uses memory storage and reports `durable: false`. It does not claim that the separately implemented Tablestore/OSS production path is active.
+
+### Why the Alibaba API URL downloads a file
+
+Alibaba Cloud reserves `Content-Disposition` on its generated Function Compute domain and adds `attachment` to browser responses. Application code cannot remove that platform header. A custom domain is the native direct-browser solution; QuoteX instead publishes the same static interface through GitHub Pages and keeps all protected API and Qwen execution on Function Compute. See Alibaba Cloud's [HTTP trigger behavior](https://www.alibabacloud.com/help/en/functioncompute/fc/http-triggers-overview) and [forced-download guidance](https://www.alibabacloud.com/help/en/functioncompute/fc-2-0/what-to-do-if-return-results-are-forcibly-downloaded-when-i-access-an-http-function-through-a-browser).
 
 ## Free-trial route
 
@@ -109,7 +119,7 @@ Alibaba Cloud's official documentation requires custom-container HTTP servers to
 npm run deploy:prepare
 ```
 
-This creates a random `QUOTEX_ACCESS_TOKEN` and copies the already-designed Qwen voice ID into `.env`. It prints only which values were generated, never their contents. Opening the final URL as `https://.../?access=<token>` sets a secure, HTTP-only cookie and removes the token from the address bar. `/api/health` remains public; listing, voice, image, video, and agent APIs require access.
+This creates a random `QUOTEX_ACCESS_TOKEN` and copies the already-designed Qwen voice ID into `.env`. It prints only which values were generated, never their contents. Open the private browser URL as `https://mongonsh.github.io/QuoteX/#access=<token>`. The fragment is never sent to GitHub, is removed from the address bar during bootstrap, and is retained only in session storage for the current tab. The client sends it to the allowlisted Function Compute API through `X-QuoteX-Access-Token`. `/api/health` remains public; listing, voice, image, video, and agent APIs require access.
 
 ## 2. Create a temporary provisioning identity
 
@@ -195,13 +205,15 @@ Shared function defaults are:
 
 The full container path additionally enables SLS request, instance, and LLM metrics; Tablestore metadata and agent evidence; private OSS product photos; and an attached RAM execution role with temporary credentials.
 
-The returned `publicUrl` is the base endpoint. The private judge link is:
+The deployer returns the Function Compute API base URL. The private judge browser link is:
 
 ```text
-<publicUrl>/?access=<the QUOTEX_ACCESS_TOKEN value in .env>
+https://mongonsh.github.io/QuoteX/#access=<the QUOTEX_ACCESS_TOKEN value in .env>
 ```
 
-After the first successful visit, the browser uses the secure cookie and the clean base URL.
+Do not publish that private link in the repository or submission text. Share it only through the hackathon's private testing field.
+
+After bootstrap, the browser uses the clean base URL and the session-scoped request header. Closing the tab clears the private access session.
 
 ## 7. Cloud smoke test
 
@@ -225,6 +237,14 @@ Verify `GET /api/health`. For the durable path, create, retrieve, stream the pho
 
 The lightweight judge path instead reports `provider: "memory"` and `durable: false`; that is expected and must remain visible in the evidence.
 
+Run the end-to-end browser proof with:
+
+```bash
+npm run verify:live-browser
+```
+
+The verifier reads the private token without printing it, checks the public HTML headers, launches the UI, confirms the fragment is removed, crosses the CORS boundary, and requires a live Qwen agent response with no console or failed-request errors.
+
 ## 8. Optional extra proof
 
 Capture one continuous, short recording showing:
@@ -232,7 +252,7 @@ Capture one continuous, short recording showing:
 1. the Alibaba Cloud console with the Function Compute function name and region;
 2. the selected ZIP artifact digest or ACR image/version;
 3. environment variable **names only**—never reveal values;
-4. the function endpoint loading QuoteX;
+4. the GitHub Pages browser URL loading QuoteX and the Network panel showing requests to the Function Compute endpoint;
 5. `/api/health` returning `ok: true` and `configured: true`;
 6. a live RFQ run whose **Agent evidence** shows model, endpoint host, planner turns, six skills, latency, usage, digest, and blocked send gate;
 7. Function Compute invocation logs for the same run.
@@ -248,10 +268,11 @@ Required Alibaba Cloud deployment code proof:
 https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts
 
 Additional Function Compute runtime evidence, when available:
-Live application: https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run
+Live browser application: https://mongonsh.github.io/QuoteX/
+Alibaba API: https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run
 Cloud console proof: <real video URL>
-Artifact version/digest: ZIP SHA-256 08ad736663b297ae69abc848c8f462dc61b2d33fe21a13e7eb052d965a748985
-Health check captured: 2026-07-20T18:34:46.000Z
+Artifact version/digest: ZIP SHA-256 d1757303bd6eea89f4c20fc034b6a9e5950bee8f7c8ec6fcf5b38842720ced86
+Health and browser checks captured: 2026-07-20T19:10:03.000Z
 Machine-readable evidence:
 https://github.com/mongonsh/QuoteX/blob/main/docs/alibaba-deployment-evidence.json
 ```

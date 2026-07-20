@@ -25,6 +25,7 @@
     "benchmark": "npm run build && node dist/tools/benchmark-agent.js",
     "evaluate": "npm run build && node dist/tools/evaluate-agent.js",
     "verify:submission": "npm run security:scan && npm run build && node dist/tools/verify-submission.js",
+    "verify:live-browser": "node tools/verify-live-browser.mjs",
     "deploy:prepare": "npm run build && node dist/tools/prepare-alibaba-deployment.js",
     "deploy:package": "npm run build && node tools/build-alibaba-code-package.mjs",
     "image:plan": "npm run build && node dist/tools/publish-alibaba-image.js",

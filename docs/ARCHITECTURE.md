@@ -143,7 +143,7 @@ All three persistence implementations share typed asynchronous repository contra
 - Rendered user/model content is escaped.
 - Customer-agent context excludes internal cost, gross profit, margin, memory evidence, and hidden policy.
 - The server emits CSP, clickjacking, MIME-sniffing, referrer, and permissions headers.
-- Paid and private APIs require a random deployment token exchanged for a secure HTTP-only cookie; health remains public.
+- Paid and private APIs require a random deployment token. The Pages client accepts it only in a URL fragment, removes it during bootstrap, retains it for the current session, and sends it to the allowlisted Function Compute API in `X-QuoteX-Access-Token`; health remains public. A custom-domain deployment can also exchange the token for a secure HTTP-only cookie.
 - Listing collection responses mask seller email addresses even after authentication.
 - Approval changes application state only. No endpoint can silently send an offer or publish a listing.
 

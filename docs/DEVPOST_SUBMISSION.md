@@ -146,11 +146,12 @@ Devpost requests a direct link to a code file demonstrating Alibaba Cloud servic
 
 It uses the official `@alicloud/fc20230330` SDK to create or update either a code-package or Custom Container function and its HTTP trigger. The adjacent infrastructure module provisions Tablestore, private OSS, SLS, and a least-privilege RAM execution role. The live Qwen orchestration module calls the Qwen Cloud workspace endpoint with six typed commerce tools. Dry-run plans are not described as live Function Compute runtime evidence.
 
-The code-package path is deployed in Japan (Tokyo). The public health endpoint identifies Alibaba Cloud Function Compute, confirms the Qwen services are configured, and honestly reports memory storage as non-durable. A protected smoke test reached `qwen3.7-plus` and returned live provider provenance. Sanitized evidence binds the endpoint and ZIP digest to source commit `74b0470`.
+The code-package path is deployed in Japan (Tokyo). The browser UI is served from GitHub Pages because Alibaba's generated Function Compute domain forces `Content-Disposition: attachment`; every protected API and Qwen call still runs on the Alibaba backend through a strict CORS allowlist. The public health endpoint identifies Function Compute, confirms the Qwen services are configured, and honestly reports memory storage as non-durable. A protected browser smoke test reached `qwen3.7-plus`, completed six of six commerce skills, and returned live provider provenance. Sanitized evidence binds the Function Compute endpoint and ZIP digest to backend source commit `3c80dab`.
 
 ## Links
 
-- Live application: `https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run`
+- Live browser application: `https://mongonsh.github.io/QuoteX/`
+- Alibaba Function Compute API: `https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run`
 - Live health check: `https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health`
 - Source code: `https://github.com/mongonsh/QuoteX`
 - Demo video: `<DEMO_VIDEO_URL>` (upload-ready local artifact: `.runtime/demo/QuoteX-motion-demo.mp4`)

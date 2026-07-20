@@ -1,17 +1,20 @@
 {
-  "schemaVersion": 1,
-  "capturedAt": "2026-07-20T18:34:46.000Z",
+  "schemaVersion": 2,
+  "capturedAt": "2026-07-20T19:10:03.000Z",
   "source": {
     "repository": "https://github.com/mongonsh/QuoteX",
-    "commit": "74b04703946fd8dd317f5ead5388ac76f9127eea",
-    "deploymentCode": "server/alibaba-fc-deployment.ts"
+    "backendCommit": "3c80dabeb46cfae8fc637426dafcedf366447e23",
+    "browserCommit": "4e2f96085cb55b98a279c6d631cd465855247157",
+    "deploymentCode": "server/alibaba-fc-deployment.ts",
+    "browserBridgeCode": "src/api-client.ts"
   },
   "artifact": {
     "deploymentMode": "code-package",
-    "sizeBytes": 2850210,
-    "sha256": "08ad736663b297ae69abc848c8f462dc61b2d33fe21a13e7eb052d965a748985",
+    "sizeBytes": 2853164,
+    "sha256": "d1757303bd6eea89f4c20fc034b6a9e5950bee8f7c8ec6fcf5b38842720ced86",
     "runtime": "custom.debian10",
-    "executable": "/var/fc/lang/nodejs20/bin/node"
+    "executable": "/var/fc/lang/nodejs20/bin/node",
+    "generatedAt": "2026-07-20T19:03:31.874Z"
   },
   "deployment": {
     "provider": "Alibaba Cloud Function Compute",
@@ -19,31 +22,55 @@
     "region": "ap-northeast-1",
     "functionName": "quotex-autopilot",
     "triggerName": "quotex-public-http",
-    "publicUrl": "https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run",
+    "apiUrl": "https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run",
+    "browserUrl": "https://mongonsh.github.io/QuoteX/",
+    "browserProvider": "GitHub Pages",
     "functionAction": "updated",
     "triggerAction": "updated",
-    "statusCode": 200,
     "accessProtected": true
   },
   "verification": {
     "healthUrl": "https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health",
     "healthStatus": 200,
-    "rootStatus": 200,
     "anonymousPaidApiStatus": 401,
-    "authenticatedQwenRequest": {
-      "path": "/api/parse-rfq",
-      "httpStatus": 200,
+    "cors": {
+      "allowedOrigin": "https://mongonsh.github.io",
+      "allowedPreflightStatus": 204,
+      "unapprovedOriginStatus": 403
+    },
+    "browser": {
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentDisposition": null,
+      "title": "QuoteX | Governed Qwen Commerce Autopilot",
+      "consoleErrors": 0,
+      "failedRequests": 0
+    },
+    "authenticatedBrowserFlow": {
+      "listingsStatus": 200,
+      "tokenRemovedFromUrl": true,
+      "tokenStoredForSession": true,
+      "agentStatus": 200,
       "traceStatus": "live",
       "model": "qwen3.7-plus",
-      "quantity": 500,
-      "destination": "Berlin distribution center",
-      "confidence": 0.98,
-      "elapsedMs": 2356
+      "endpointHost": "dashscope-intl.aliyuncs.com",
+      "elapsedMs": 11512,
+      "plannerTurns": 2,
+      "completedSkills": 6,
+      "requiredSkills": 6,
+      "approvalGate": "human-review-required",
+      "consoleErrors": 0,
+      "failedRequests": 0
     }
   },
   "storage": {
     "provider": "memory",
     "durable": false,
     "note": "The public judge deployment is intentionally lightweight. The checked-in production path provisions Tablestore, private OSS, SLS, and a least-privilege runtime role."
+  },
+  "platformConstraint": {
+    "generatedDomainContentDisposition": "attachment",
+    "browserEntryPoint": "GitHub Pages",
+    "note": "Alibaba Cloud reserves Content-Disposition on generated Function Compute domains. The Pages client is static; all protected APIs and Qwen execution remain on Function Compute."
   }
 }
