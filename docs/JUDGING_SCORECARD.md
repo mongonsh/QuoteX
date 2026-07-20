@@ -1,6 +1,6 @@
 # QuoteX judging scorecard
 
-This document maps the implementation directly to the published judging rubric. It separates code-backed evidence from submission evidence that still requires a real public URL or recording.
+This document maps the implementation directly to the published judging rubric. It separates code-backed evidence from the remaining owner-provided demo-video evidence.
 
 ## Technical Depth and Engineering - 30%
 
@@ -48,6 +48,7 @@ This document maps the implementation directly to the published judging rubric. 
 | Is architecture clear? | Diagram, tool contracts, request flow, persistence, failures, threat model, and API surface are documented | `docs/ARCHITECTURE.md`, `diagrams/` |
 | Is reproduction clear? | README includes model routing, environment contract, local setup, probes, tests, benchmark, and deployment path | `README.md` |
 | Is cloud proof repeatable? | Dry-run/apply commands provision managed storage and RAM, publish an immutable ACR image, and create or update FC and its trigger while redacting secrets | `npm run provision:plan`, `npm run image:plan`, `npm run deploy:plan` |
+| Is the backend actually deployed? | The public Function Compute health endpoint reports the FC runtime and configured Qwen services; sanitized evidence binds the endpoint and ZIP digest to the deployed commit | Live `/api/health`, `docs/alibaba-deployment-evidence.json` |
 | Is it open source? | Root MIT license and package metadata are present | `LICENSE`, `package.json` |
 
 ## Measured evidence
@@ -78,6 +79,5 @@ The exact protocol and limitations are in `docs/EVALUATION.md`.
 - Upload the finished 102-second `.runtime/demo/QuoteX-motion-demo.mp4` to a public or unlisted Devpost-supported host.
 - Confirm `https://github.com/mongonsh/QuoteX` is public and includes `server/alibaba-fc-deployment.ts`; use that public code URL as the required Alibaba Cloud API proof.
 - Replace the demo-video placeholder in `docs/DEVPOST_SUBMISSION.md`.
-- The published submission format requires the Alibaba code-file link. A public Function Compute URL and console recording are separate, stronger runtime evidence and must be included only if the real apply succeeds.
 
-Do not claim a public deployment or recording until the real evidence exists.
+The public Function Compute deployment is complete. Use the required code-file link plus `docs/alibaba-deployment-evidence.json` and the live health endpoint as additional runtime proof. A cloud-console recording is optional; never expose environment values or the private access token.

@@ -30,6 +30,7 @@ QuoteX automates the repetitive work while keeping the commercial decision accou
 - **Measured baseline:** `npm run benchmark` executes 100 checked-in workflows and currently reports 100% product selection, quote arithmetic, approval-gate enforcement, and no-model fallback completion. It deliberately makes no unmeasured human-time claim.
 - **Measured architecture advantage:** a live six-case adversarial evaluation gave the governed Qwen tool agent **42/42 checks** versus **28/42** for the same Qwen3.7 model producing the decision in one prompt, a **33.3-point lift**. The fixtures, scorer, result, and limitations are checked in.
 - **Executable Alibaba Cloud stack:** official SDKs provision Tablestore, private OSS, SLS, and a least-privilege RAM role; an AMD64 publisher captures the immutable ACR digest; the FC3 SDK creates or updates the Custom Container and protected HTTP entry point.
+- **Live Alibaba runtime:** the ACR-free build is deployed on Function Compute in Japan (Tokyo). Its public health check reports the real FC runtime and configured Qwen services; paid AI routes remain protected by a private access token.
 
 ![Live Qwen six-skill decision evidence](docs/screenshots/quotex-live-agent-evidence.png)
 
@@ -166,6 +167,16 @@ QuoteX has two executable Function Compute deployment paths:
 - `code-package`: an ACR-free 2.85 MB ZIP that runs on Function Compute's built-in Node.js 20 executable. It is the fastest judge-demo route and uses explicitly non-durable memory storage unless Alibaba Tablestore and OSS are configured.
 - `custom-container`: an immutable AMD64 ACR image with Tablestore, private OSS, SLS, and a least-privilege RAM role for the durable production architecture.
 
+### Verified live deployment
+
+- Application: [QuoteX on Alibaba Function Compute](https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run)
+- Public health: [`GET /api/health`](https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health)
+- Region and runtime: `ap-northeast-1`, `custom.debian10`, built-in Node.js 20
+- Deployed source: commit [`063a7c3`](https://github.com/mongonsh/QuoteX/commit/063a7c35049ef09e41d23741ac80e533506b89ac)
+- Machine-readable proof: [docs/alibaba-deployment-evidence.json](docs/alibaba-deployment-evidence.json)
+
+The public URL loads the interface and exposes health metadata. Live paid AI endpoints require the private judge link and return `401` without it. This judge deployment honestly reports `storage.provider: "memory"` and `durable: false`; the checked-in Tablestore, OSS, SLS, and RAM path is the durable production deployment.
+
 Build and inspect the ACR-free request:
 
 ```bash
@@ -177,9 +188,9 @@ npm run deploy:fc
 
 Set `ALIBABA_FC_DEPLOYMENT_MODE=code` and `QUOTEX_STORAGE_PROVIDER=memory` for that demo route. The full apply sequence remains `npm run provision:alibaba`, `npm run image:publish`, and `npm run deploy:fc`; it provisions managed storage and logging, captures an immutable ACR digest, then creates or updates Function Compute and its HTTP trigger. Both dry runs redact every Qwen key and the private demo token.
 
-Devpost specifies a repository code-file link as the required Alibaba Cloud deployment proof. Use [server/alibaba-fc-deployment.ts](server/alibaba-fc-deployment.ts): it constructs and executes the official FC3 `CreateFunction`/`UpdateFunction` and HTTP-trigger requests. [server/alibaba-cloud-infrastructure.ts](server/alibaba-cloud-infrastructure.ts) provisions Tablestore, OSS, SLS, and RAM, while [server/qwen-tool-orchestrator.ts](server/qwen-tool-orchestrator.ts) shows the live Qwen Cloud runtime boundary.
+Devpost specifies a repository code-file link as the required Alibaba Cloud deployment proof. Use [server/alibaba-fc-deployment.ts](server/alibaba-fc-deployment.ts): it constructs and executes the official FC3 `CreateFunction`/`UpdateFunction` and HTTP-trigger requests. [server/alibaba-cloud-infrastructure.ts](server/alibaba-cloud-infrastructure.ts) provisions Tablestore, OSS, SLS, and RAM, while [server/qwen-tool-orchestrator.ts](server/qwen-tool-orchestrator.ts) shows the live Qwen Cloud runtime boundary. The separate [deployment evidence](docs/alibaba-deployment-evidence.json) binds the running endpoint and ZIP digest to the exact deployed commit.
 
-The code-proof requirement is distinct from additional runtime evidence. A Function Compute URL, artifact digest, health response, or console recording is reported only after the apply command succeeds. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the evidence contract and both reproducible deployment paths.
+The code-proof requirement is distinct from additional runtime evidence. The Function Compute URL, artifact digest, health response, and authenticated Qwen smoke test were recorded only after the apply command succeeded. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the evidence contract and both reproducible deployment paths.
 
 ## Repository map
 

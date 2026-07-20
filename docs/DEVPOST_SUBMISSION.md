@@ -41,7 +41,7 @@ Second, a seller or export team can run an incoming buyer request. Qwen3.7 opera
 5. Calculate a margin-safe landed offer.
 6. Enforce risk policy and stop at human approval.
 
-The output is not just a chat response. QuoteX shows the selected SKU, quote arithmetic, freight route, relevant memories, risk checks, skill source, planner turns, latency, token usage, approval state, and SHA-256 audit digest. Every cloud run is persisted in a Tablestore evidence ledger.
+The output is not just a chat response. QuoteX shows the selected SKU, quote arithmetic, freight route, relevant memories, risk checks, skill source, planner turns, latency, token usage, approval state, and SHA-256 audit digest. The durable cloud path persists the last 200 runs in a Tablestore evidence ledger; the lightweight public judge deployment explicitly reports its non-durable memory adapter.
 
 Once the offer exists, the same product record powers a campaign workflow. Qwen vision creates a grounded creative brief, Wan/Qwen Image produces a commercial edit, and HappyHorse animates the frame. Amazon, eBay, and Alibaba.com adapters create validation-first draft payloads with platform-specific title limits, condition mapping, required fields, and warnings. They deliberately do not publish until OAuth and human approval are implemented.
 
@@ -114,6 +114,7 @@ Qwen's streamed WAV responses can use sentinel RIFF and data lengths intended fo
 - Idempotent Alibaba provisioning for Tablestore, private OSS, SLS, and a least-privilege RAM execution role.
 - Secret-safe AMD64 image publication to ACR with immutable digest capture.
 - Idempotent FC3 function and HTTP-trigger deployment with readiness polling and a private demo-link gate.
+- A live Japan-region Function Compute deployment with a public health endpoint, protected AI routes, and a verified end-to-end `qwen3.7-plus` request.
 
 ## Impact and product path
 
@@ -127,7 +128,7 @@ Production autonomy is not the absence of humans. It is the removal of repetitiv
 
 ## What's next
 
-- Apply the checked-in Alibaba provisioning, ACR image, and FC3 deployment plans and publish the real protected Function Compute demo URL.
+- Upgrade the lightweight public Function Compute route from memory storage to the checked-in Tablestore, private OSS, SLS, and RAM production path.
 - Add tenant identity, role-based approval limits, signed events, rate limits, and idempotency.
 - Connect CRM, ERP, catalog, and freight services through authenticated MCP tools using the existing typed contracts.
 - Add OAuth-backed Amazon, eBay, and Alibaba.com publishing after the existing validation and approval gates.
@@ -145,11 +146,15 @@ Devpost requests a direct link to a code file demonstrating Alibaba Cloud servic
 
 It uses the official `@alicloud/fc20230330` SDK to create or update either a code-package or Custom Container function and its HTTP trigger. The adjacent infrastructure module provisions Tablestore, private OSS, SLS, and a least-privilege RAM execution role. The live Qwen orchestration module calls the Qwen Cloud workspace endpoint with six typed commerce tools. Dry-run plans are not described as live Function Compute runtime evidence.
 
+The code-package path is deployed in Japan (Tokyo). The public health endpoint identifies Alibaba Cloud Function Compute, confirms the Qwen services are configured, and honestly reports memory storage as non-durable. A protected smoke test reached `qwen3.7-plus` and returned live provider provenance. Sanitized evidence binds the endpoint and ZIP digest to source commit `063a7c3`.
+
 ## Links
 
-- Live application: `<PUBLIC_DEMO_URL>`
+- Live application: `https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run`
+- Live health check: `https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health`
 - Source code: `https://github.com/mongonsh/QuoteX`
 - Demo video: `<DEMO_VIDEO_URL>` (upload-ready local artifact: `.runtime/demo/QuoteX-motion-demo.mp4`)
 - Required Alibaba Cloud deployment code proof: `https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts`
+- Sanitized runtime evidence: `https://github.com/mongonsh/QuoteX/blob/main/docs/alibaba-deployment-evidence.json`
 - Live Qwen Cloud runtime integration: `https://github.com/mongonsh/QuoteX/blob/main/server/qwen-tool-orchestrator.ts`
 - Governed-agent evaluation: `https://github.com/mongonsh/QuoteX/blob/main/docs/EVALUATION.md`

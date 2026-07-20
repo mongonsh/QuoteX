@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-20T18:17:03.303Z",
+  "source": {
+    "repository": "https://github.com/mongonsh/QuoteX",
+    "commit": "063a7c35049ef09e41d23741ac80e533506b89ac",
+    "deploymentCode": "server/alibaba-fc-deployment.ts"
+  },
+  "artifact": {
+    "deploymentMode": "code-package",
+    "sizeBytes": 2850210,
+    "sha256": "7884c54f400f3e8d5eead76c34caaf50039f5dce47a8ab3754ad45524c5ec75d",
+    "runtime": "custom.debian10",
+    "executable": "/var/fc/lang/nodejs20/bin/node"
+  },
+  "deployment": {
+    "provider": "Alibaba Cloud Function Compute",
+    "api": "FC/2023-03-30",
+    "region": "ap-northeast-1",
+    "functionName": "quotex-autopilot",
+    "triggerName": "quotex-public-http",
+    "publicUrl": "https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run",
+    "functionAction": "updated",
+    "triggerAction": "updated",
+    "statusCode": 200,
+    "accessProtected": true
+  },
+  "verification": {
+    "healthUrl": "https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health",
+    "healthStatus": 200,
+    "rootStatus": 200,
+    "anonymousPaidApiStatus": 401,
+    "authenticatedQwenRequest": {
+      "path": "/api/parse-rfq",
+      "httpStatus": 200,
+      "traceStatus": "live",
+      "model": "qwen3.7-plus",
+      "quantity": 500,
+      "destination": "Berlin distribution center",
+      "confidence": 0.98,
+      "elapsedMs": 2730
+    }
+  },
+  "storage": {
+    "provider": "memory",
+    "durable": false,
+    "note": "The public judge deployment is intentionally lightweight. The checked-in production path provisions Tablestore, private OSS, SLS, and a least-privilege runtime role."
+  }
+}

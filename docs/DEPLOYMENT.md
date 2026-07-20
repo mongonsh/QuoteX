@@ -21,7 +21,30 @@ https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts
 
 That file uses the official `@alicloud/fc20230330` SDK to create or update either a custom-runtime code package or Custom Container function, wait for readiness, and create or update its HTTP trigger. The infrastructure and storage modules provide additional inspectable proof of Tablestore, OSS, SLS, RAM, and Alibaba temporary-credential use.
 
-A dry run proves request construction without changing cloud state. It is not presented as a live Function Compute deployment. Runtime URL, image digest, health response, and console evidence are added only after the explicit apply sequence succeeds.
+A dry run proves request construction without changing cloud state. It is not presented as a live Function Compute deployment. Runtime URL, artifact digest, and health evidence below were added only after the explicit apply sequence succeeded.
+
+## Verified live deployment
+
+The ACR-free path is live in Alibaba Cloud Function Compute:
+
+```text
+Application: https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run
+Health:      https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health
+Region:      ap-northeast-1 (Japan/Tokyo)
+Function:    quotex-autopilot
+Runtime:     custom.debian10 with the built-in Node.js 20 executable
+Source:      063a7c35049ef09e41d23741ac80e533506b89ac
+ZIP SHA-256: 7884c54f400f3e8d5eead76c34caaf50039f5dce47a8ab3754ad45524c5ec75d
+```
+
+At `2026-07-20T18:17:03.303Z`, verification returned:
+
+- `200` from the application and public health endpoint;
+- `401` from a paid API without the private access token;
+- `200` from an authenticated `/api/parse-rfq` request;
+- live `qwen3.7-plus` provenance, quantity `500`, destination `Berlin distribution center`, confidence `0.98`, and 2,730 ms model latency.
+
+The sanitized, machine-readable record is [alibaba-deployment-evidence.json](alibaba-deployment-evidence.json). The current public judge route uses memory storage and reports `durable: false`. It does not claim that the separately implemented Tablestore/OSS production path is active.
 
 ## Free-trial route
 
@@ -218,17 +241,19 @@ Before recording, close unrelated tabs, hide account IDs if desired, and verify 
 
 ## 9. Submission evidence block
 
-The repository code link is the required proof artifact. Add the separate runtime fields only after they exist:
+The repository code link is the required proof artifact. The separate runtime fields now contain verified values:
 
 ```text
 Required Alibaba Cloud deployment code proof:
 https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts
 
 Additional Function Compute runtime evidence, when available:
-Live application: <real public Function Compute URL>
+Live application: https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run
 Cloud console proof: <real video URL>
-Artifact version/digest: <ZIP SHA-256 or immutable ACR reference>
-Health check captured: <UTC timestamp>
+Artifact version/digest: ZIP SHA-256 7884c54f400f3e8d5eead76c34caaf50039f5dce47a8ab3754ad45524c5ec75d
+Health check captured: 2026-07-20T18:17:03.303Z
+Machine-readable evidence:
+https://github.com/mongonsh/QuoteX/blob/main/docs/alibaba-deployment-evidence.json
 ```
 
 The three-minute product demo remains a separate submission requirement. Do not submit placeholders as evidence.
