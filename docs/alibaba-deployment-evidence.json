@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-20T18:17:03.303Z",
+  "capturedAt": "2026-07-20T18:34:46.000Z",
   "source": {
     "repository": "https://github.com/mongonsh/QuoteX",
-    "commit": "063a7c35049ef09e41d23741ac80e533506b89ac",
+    "commit": "74b04703946fd8dd317f5ead5388ac76f9127eea",
     "deploymentCode": "server/alibaba-fc-deployment.ts"
   },
   "artifact": {
     "deploymentMode": "code-package",
     "sizeBytes": 2850210,
-    "sha256": "7884c54f400f3e8d5eead76c34caaf50039f5dce47a8ab3754ad45524c5ec75d",
+    "sha256": "08ad736663b297ae69abc848c8f462dc61b2d33fe21a13e7eb052d965a748985",
     "runtime": "custom.debian10",
     "executable": "/var/fc/lang/nodejs20/bin/node"
   },
@@ -38,7 +38,7 @@
       "quantity": 500,
       "destination": "Berlin distribution center",
       "confidence": 0.98,
-      "elapsedMs": 2730
+      "elapsedMs": 2356
     }
   },
   "storage": {

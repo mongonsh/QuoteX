@@ -146,7 +146,7 @@ Devpost requests a direct link to a code file demonstrating Alibaba Cloud servic
 
 It uses the official `@alicloud/fc20230330` SDK to create or update either a code-package or Custom Container function and its HTTP trigger. The adjacent infrastructure module provisions Tablestore, private OSS, SLS, and a least-privilege RAM execution role. The live Qwen orchestration module calls the Qwen Cloud workspace endpoint with six typed commerce tools. Dry-run plans are not described as live Function Compute runtime evidence.
 
-The code-package path is deployed in Japan (Tokyo). The public health endpoint identifies Alibaba Cloud Function Compute, confirms the Qwen services are configured, and honestly reports memory storage as non-durable. A protected smoke test reached `qwen3.7-plus` and returned live provider provenance. Sanitized evidence binds the endpoint and ZIP digest to source commit `063a7c3`.
+The code-package path is deployed in Japan (Tokyo). The public health endpoint identifies Alibaba Cloud Function Compute, confirms the Qwen services are configured, and honestly reports memory storage as non-durable. A protected smoke test reached `qwen3.7-plus` and returned live provider provenance. Sanitized evidence binds the endpoint and ZIP digest to source commit `74b0470`.
 
 ## Links
 

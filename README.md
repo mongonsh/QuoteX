@@ -172,7 +172,7 @@ QuoteX has two executable Function Compute deployment paths:
 - Application: [QuoteX on Alibaba Function Compute](https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run)
 - Public health: [`GET /api/health`](https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/health)
 - Region and runtime: `ap-northeast-1`, `custom.debian10`, built-in Node.js 20
-- Deployed source: commit [`063a7c3`](https://github.com/mongonsh/QuoteX/commit/063a7c35049ef09e41d23741ac80e533506b89ac)
+- Deployed source: commit [`74b0470`](https://github.com/mongonsh/QuoteX/commit/74b04703946fd8dd317f5ead5388ac76f9127eea)
 - Machine-readable proof: [docs/alibaba-deployment-evidence.json](docs/alibaba-deployment-evidence.json)
 
 The public URL loads the interface and exposes health metadata. Live paid AI endpoints require the private judge link and return `401` without it. This judge deployment honestly reports `storage.provider: "memory"` and `durable: false`; the checked-in Tablestore, OSS, SLS, and RAM path is the durable production deployment.

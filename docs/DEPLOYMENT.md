@@ -33,16 +33,16 @@ Health:      https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run/api/hea
 Region:      ap-northeast-1 (Japan/Tokyo)
 Function:    quotex-autopilot
 Runtime:     custom.debian10 with the built-in Node.js 20 executable
-Source:      063a7c35049ef09e41d23741ac80e533506b89ac
-ZIP SHA-256: 7884c54f400f3e8d5eead76c34caaf50039f5dce47a8ab3754ad45524c5ec75d
+Source:      74b04703946fd8dd317f5ead5388ac76f9127eea
+ZIP SHA-256: 08ad736663b297ae69abc848c8f462dc61b2d33fe21a13e7eb052d965a748985
 ```
 
-At `2026-07-20T18:17:03.303Z`, verification returned:
+At `2026-07-20T18:34:46.000Z`, verification returned:
 
 - `200` from the application and public health endpoint;
 - `401` from a paid API without the private access token;
 - `200` from an authenticated `/api/parse-rfq` request;
-- live `qwen3.7-plus` provenance, quantity `500`, destination `Berlin distribution center`, confidence `0.98`, and 2,730 ms model latency.
+- live `qwen3.7-plus` provenance, quantity `500`, destination `Berlin distribution center`, confidence `0.98`, and 2,356 ms model latency.
 
 The sanitized, machine-readable record is [alibaba-deployment-evidence.json](alibaba-deployment-evidence.json). The current public judge route uses memory storage and reports `durable: false`. It does not claim that the separately implemented Tablestore/OSS production path is active.
 
@@ -250,8 +250,8 @@ https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts
 Additional Function Compute runtime evidence, when available:
 Live application: https://quotex-utopilot-vybltedhtp.ap-northeast-1.fcapp.run
 Cloud console proof: <real video URL>
-Artifact version/digest: ZIP SHA-256 7884c54f400f3e8d5eead76c34caaf50039f5dce47a8ab3754ad45524c5ec75d
-Health check captured: 2026-07-20T18:17:03.303Z
+Artifact version/digest: ZIP SHA-256 08ad736663b297ae69abc848c8f462dc61b2d33fe21a13e7eb052d965a748985
+Health check captured: 2026-07-20T18:34:46.000Z
 Machine-readable evidence:
 https://github.com/mongonsh/QuoteX/blob/main/docs/alibaba-deployment-evidence.json
 ```
