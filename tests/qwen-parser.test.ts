@@ -1,27 +1,33 @@
 import assert from "node:assert/strict";
 import { customers, products, rfqScenarios } from "../src/data.js";
 import { parseRfqWithQwen } from "../server/qwen-parser.js";
+import { createTestConfig, TEST_CREDENTIALS } from "./test-config.js";
 
 const originalFetch = globalThis.fetch;
-let requestBody: { messages: Array<{ content: string }> } | null = null;
+let requestBody: {
+  messages: Array<{ content: string }>;
+  response_format?: { type?: string };
+  enable_thinking?: boolean;
+  max_tokens?: number;
+} | null = null;
 
 globalThis.fetch = async (_url, options) => {
   requestBody = JSON.parse(String(options?.body));
 
   return new Response(
     JSON.stringify({
-      model: "qwen3.6-flash",
+      model: "qwen3.7-plus",
       choices: [
         {
           message: {
             content: JSON.stringify({
               quantity: 500,
-              destination: "Yokohama warehouse",
-              deadlineDays: 7,
-              language: "Japanese",
+              destination: "Berlin distribution center",
+              deadlineDays: 21,
+              language: "English",
               commercialTerms: "Net 30 requested",
-              productHints: ["AUR-CTRL-24"],
-              shippingPreference: "DHL if needed",
+              productHints: ["MNG-CASH-SCF"],
+              shippingPreference: "DHL under USD 1,000",
               paymentPreference: "Net 30",
               uncertaintyFlags: [],
               confidence: 0.94
@@ -37,18 +43,11 @@ globalThis.fetch = async (_url, options) => {
 
 try {
   const result = await parseRfqWithQwen({
-    config: {
-      qwen: {
-        apiKey: "sk-test",
-        imageApiKey: "",
-        baseUrl: "https://example.test/compatible-mode/v1",
-        model: "qwen3.6-flash",
-        marketingModel: "qwen3.6-flash",
-        imageModel: "qwen-image-2.0-pro",
-        imageEndpoint: "https://example.test/api/v1/image",
-        timeoutMs: 100
-      }
-    },
+    config: createTestConfig({
+      imageModel: "qwen-image-2.0-pro",
+      imageFallbackModel: "wan2.7-image-pro",
+      timeoutMs: 100
+    }),
     payload: {
       rfq: rfqScenarios[0]!,
       customer: customers[0]!,
@@ -61,28 +60,41 @@ try {
   assert.equal(result.trace.status, "live");
   assert.equal(result.trace.usage!.total_tokens, 222);
   assert.match(requestBody!.messages[0]!.content, /untrusted data/i);
+  assert.equal(requestBody!.response_format?.type, "json_object");
+  assert.equal(requestBody!.enable_thinking, false);
+  assert.equal("max_tokens" in requestBody!, false);
   assert.match(result.trace.prompt!, /prompt-injection/i);
   assert.equal(
     requestBody!.messages.some((message: { content: string }) =>
-      String(message.content).includes("sk-test")
+      String(message.content).includes(TEST_CREDENTIALS.apiKey)
     ),
     false
   );
 
+  const sellerResult = await parseRfqWithQwen({
+    config: createTestConfig({ timeoutMs: 100 }),
+    payload: {
+      rfq: {
+        ...rfqScenarios[0]!,
+        id: "listing:test",
+        listingId: "test",
+        source: "seller-listing",
+        origin: "Tokyo, Japan",
+        subject: "Hermes Birkin 25 seller intake",
+        rawMessage: "I want to sell one Hermes Birkin 25 for USD 15000."
+      },
+      customer: { ...customers[0]!, market: "United States" },
+      products: []
+    }
+  });
+  assert.equal(sellerResult.ok, true);
+  assert.match(sellerResult.trace.prompt!, /private product seller intake/i);
+  assert.match(sellerResult.trace.prompt!, /seller-supplied inventory/i);
+  assert.equal(sellerResult.trace.prompt!.includes("AUR-CTRL-24"), false);
+
   await assert.rejects(
     parseRfqWithQwen({
-      config: {
-        qwen: {
-          apiKey: "sk-test",
-          imageApiKey: "",
-          baseUrl: "https://example.test/compatible-mode/v1",
-          model: "qwen3.6-flash",
-          marketingModel: "qwen3.6-flash",
-          imageModel: "qwen-image-2.0-pro",
-          imageEndpoint: "https://example.test/api/v1/image",
-          timeoutMs: 100
-        }
-      },
+      config: createTestConfig({ timeoutMs: 100 }),
       payload: {
         rfq: { ...rfqScenarios[0]!, rawMessage: "x".repeat(12_001) },
         customer: customers[0]!,

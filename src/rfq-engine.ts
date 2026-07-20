@@ -1,6 +1,7 @@
 import { customers, pricingRules, products, shippingOptions } from "./data.js";
 import { parseRfqWithQwen } from "./qwen-client.js";
 import type {
+  AgentRunEvidence,
   Analysis,
   Customer,
   ExecutionProof,
@@ -15,6 +16,7 @@ import type {
   QwenTrace,
   RfqScenario,
   ScoredShippingOption,
+  ShippingOption,
   TimelineStep
 } from "./types.js";
 
@@ -34,31 +36,38 @@ export async function runAutopilot(
 ): Promise<Analysis> {
   const customer = context.customer || findById(customers, rfq.customerId);
   const deterministicParsed = parseRfqDeterministically(rfq);
-  const qwenResult = await parseRfqWithQwen(rfq, { customer, products }).catch(() => null);
+  const availableProducts = rfq.source === "seller-listing" ? [] : products;
+  const qwenResult = await parseRfqWithQwen(rfq, { customer, products: availableProducts }).catch(() => null);
   const parsed = mergeParsedRfq(deterministicParsed, qwenResult?.parsed);
-  const matchedCandidates = matchProducts(
-    `${rfq.rawMessage} ${(parsed.productHints || []).join(" ")}`,
-    products
+  const agentDecision = qwenResult?.decision;
+  const matchedCandidates = agentDecision
+    ? []
+    : rfq.source === "seller-listing"
+      ? []
+      : matchProducts(`${rfq.rawMessage} ${(parsed.productHints || []).join(" ")}`, products);
+  const productCandidates = agentDecision?.productCandidates || (
+    rfq.source === "seller-listing"
+      ? [buildSellerListingProductCandidate({ parsed, rfq })]
+      : matchedCandidates.length
+        ? matchedCandidates
+        : [buildUncatalogedProductCandidate({ parsed, rfq })]
   );
-  const productCandidates = matchedCandidates.length
-    ? matchedCandidates
-    : [buildUncatalogedProductCandidate({ parsed, rfq })];
-  const selectedProduct = productCandidates[0]!;
-  const relevantMemories = recallMemories(customer, rfq.rawMessage);
-  const shipping = chooseShipping(customer, rfq, relevantMemories);
-  const quote = priceQuote({
+  const selectedProduct = agentDecision?.selectedProduct || productCandidates[0]!;
+  const relevantMemories = agentDecision?.relevantMemories || recallMemories(customer, rfq.rawMessage);
+  const shipping = agentDecision?.shipping || chooseShipping(customer, rfq, relevantMemories);
+  const quote = agentDecision?.quote || priceQuote({
     customer,
     product: selectedProduct.product,
     quantity: parsed.quantity,
     shipping,
     memories: relevantMemories
   });
-  const risks = assessRisks({
+  const risks = agentDecision?.risks || assessRisks({
     customer,
     parsed,
     productCandidates,
-    quote,
     rfq,
+    quote,
     selectedProduct
   });
   const timeline = buildTimeline({
@@ -68,6 +77,7 @@ export async function runAutopilot(
     qwenTrace: qwenResult?.trace || null,
     quote,
     relevantMemories,
+    rfq,
     risks,
     shipping
   });
@@ -81,6 +91,7 @@ export async function runAutopilot(
     quote
   });
   const executionProof = buildExecutionProof({
+    agentRun: qwenResult?.agentRun || undefined,
     qwenTrace: qwenResult?.trace,
     relevantMemories,
     risks,
@@ -105,6 +116,7 @@ export async function runAutopilot(
       status: "skipped",
       reason: "Qwen parser did not run."
     },
+    ...(qwenResult?.agentRun ? { agentRun: qwenResult.agentRun } : {}),
     approval: {
       required: true,
       status: "pending",
@@ -112,7 +124,7 @@ export async function runAutopilot(
         ? "Human approval required because the agent found quote risks."
         : "Human approval required before sending a commercial offer."
     },
-    draftEmail: buildDraftEmail({ customer, parsed, quote, risks, shipping })
+    draftEmail: buildDraftEmail({ customer, parsed, quote, risks, rfq, shipping })
   };
 }
 
@@ -189,39 +201,47 @@ export function measureMemoryImpact({
 }
 
 export function buildExecutionProof({
+  agentRun,
   qwenTrace,
   relevantMemories,
   risks,
   timeline
 }: {
+  agentRun?: AgentRunEvidence;
   qwenTrace?: QwenTrace;
   relevantMemories: MemoryRecord[];
   risks: QuoteRisk[];
   timeline: TimelineStep[];
 }): ExecutionProof {
   const qwenLive = qwenTrace?.status === "live";
+  const completedSkills = agentRun?.completedSkills.length || 0;
+  const requiredSkills = agentRun?.requiredSkills.length || 0;
 
   return {
     auditId: `QX-${Date.now().toString(36).toUpperCase()}`,
-    qwenStatus: qwenLive ? "Live Qwen Cloud" : "Guarded fallback",
-    qwenCalls: qwenLive ? 1 : 0,
-    autonomousStages: Math.max(0, timeline.length - 1),
-    deterministicToolStages: 3,
+    qwenStatus: qwenLive ? "Live Qwen planner" : "Guarded fallback",
+    qwenCalls: qwenLive ? Math.max(1, agentRun?.plannerTurns || 1) : 0,
+    autonomousStages: agentRun?.skillExecutions.length || Math.max(0, timeline.length - 1),
+    deterministicToolStages: agentRun ? Math.max(0, completedSkills - 1) : 3,
     policyChecks: 6,
     memoryFactsRead: relevantMemories.length,
     risksEscalated: risks.length,
     humanDecisions: 1,
-    fallbackProtected: !qwenLive
+    fallbackProtected: !qwenLive || Boolean(agentRun?.skillExecutions.some((step) => step.initiatedBy === "guardrail")),
+    plannerTurns: agentRun?.plannerTurns,
+    toolCalls: agentRun?.skillExecutions.length,
+    skillCoverage: requiredSkills ? completedSkills / requiredSkills : undefined,
+    auditDigest: agentRun?.auditDigest
   };
 }
 
 export function parseRfqDeterministically(rfq: RfqScenario): ParsedRfq {
-  const quantity = extractQuantity(rfq.rawMessage) || (rfq.isCustomDraft ? 1 : rfq.expectedQuantity);
+  const quantity = extractExplicitQuantity(rfq.rawMessage) || (rfq.isCustomDraft ? 1 : rfq.expectedQuantity);
   const destination = extractDestination(rfq.rawMessage) || (rfq.isCustomDraft ? "Needs confirmation" : rfq.destination);
   const deadlineDays = extractDeadlineDays(rfq.rawMessage) || (rfq.isCustomDraft ? 14 : rfq.deadlineDays);
   const uncertaintyFlags = [];
 
-  if (rfq.isCustomDraft && !extractQuantity(rfq.rawMessage)) {
+  if (rfq.isCustomDraft && !extractExplicitQuantity(rfq.rawMessage)) {
     uncertaintyFlags.push("Quantity was not explicit; defaulted to one item.");
   }
 
@@ -255,7 +275,12 @@ export function matchProducts(message: string, catalog: Product[]): ProductCandi
       const nameHits = normalize(product.name)
         .split(" ")
         .filter((part) => part.length > 3 && normalized.includes(part));
-      const score = Math.min(0.98, aliasHits.length * 0.44 + nameHits.length * 0.08);
+      const aliasScore = aliasHits.reduce(
+        (score, alias) => score + 0.44 + phrasePolarityAdjustment(normalized, normalize(alias)),
+        0
+      );
+      const intentBoost = explicitProductIntentBoost(product, normalized);
+      const score = Math.max(0, Math.min(0.98, aliasScore + nameHits.length * 0.08 + intentBoost));
 
       return {
         product,
@@ -301,6 +326,42 @@ export function buildUncatalogedProductCandidate({
   };
 }
 
+export function buildSellerListingProductCandidate({
+  parsed,
+  rfq
+}: {
+  parsed: ParsedRfq;
+  rfq: RfqScenario;
+}): ProductCandidate {
+  const askingPrice = extractTargetPrice(rfq.rawMessage) || 120;
+  const structuredSubject = rfq.subject.split(/\s*[·|]\s*/)[0]?.trim() || "";
+  const itemName =
+    structuredSubject && !/\b(?:intake|request|listing)\b/i.test(structuredSubject)
+      ? fitText(structuredSubject, 68)
+      : extractProductName(rfq.rawMessage, parsed.productHints);
+  const shortId = (rfq.listingId || rfq.id).replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase();
+
+  return {
+    product: {
+      sku: `ITEM-${shortId || "INTAKE"}`,
+      name: itemName,
+      category: "Seller-supplied product",
+      aliases: [],
+      hsCode: "TBD after product verification",
+      origin: rfq.origin || "Seller supplied",
+      stock: 1,
+      unitCostUsd: roundMoney(askingPrice * 0.62),
+      listPriceUsd: askingPrice,
+      leadTimeDays: 2,
+      moq: 1,
+      certification: []
+    },
+    score: 0.94,
+    reason: "Structured from the saved seller intake; independent product verification is pending.",
+    requiresAuthentication: true
+  };
+}
+
 export function recallMemories(customer: Customer, message: string): MemoryRecord[] {
   const normalized = normalize(message);
 
@@ -318,16 +379,30 @@ export function chooseShipping(
   rfq: RfqScenario,
   memories: MemoryRecord[]
 ): ScoredShippingOption {
-  const marketOptions = shippingOptions.filter((option) =>
-    option.markets.includes(customer.market)
-  );
+  const marketOptions = rfq.source === "seller-listing"
+    ? buildInsuredResaleRoutes(rfq, customer.market)
+    : shippingOptions.filter(
+        (option) =>
+          option.markets.includes(customer.market) &&
+          (!option.customerIds || option.customerIds.includes(customer.id))
+      );
   const prefersDhl = memories.some((memory) =>
     normalize(memory.title).includes("dhl")
   );
   const costCeiling = extractFreightCeiling(rfq.rawMessage);
 
   const scored = marketOptions.map((option) => {
-    const preferenceBoost = prefersDhl && option.carrier.includes("DHL") ? 0.22 : 0;
+    const carrierMemoryMatch = memories.some((memory) => {
+      const acceptedCarrier = normalize(memory.acceptedCarrier || "");
+      const memoryText = normalize(`${memory.title} ${memory.evidence}`);
+      const carrier = normalize(option.carrier);
+      return acceptedCarrier === carrier || memoryText.includes(carrier);
+    });
+    const preferenceBoost = carrierMemoryMatch
+      ? 0.34
+      : prefersDhl && option.carrier.includes("DHL")
+        ? 0.14
+        : 0;
     const speedFit = rfq.deadlineDays >= option.days ? 0.28 : -0.32;
     const costFit = costCeiling && option.costUsd > costCeiling ? -0.24 : 0.12;
     const reliability = option.reliability * 0.26;
@@ -341,6 +416,35 @@ export function chooseShipping(
   const selected = scored.sort((a, b) => b.score - a.score)[0];
   if (!selected) throw new Error(`No shipping option configured for ${customer.market}`);
   return selected;
+}
+
+function buildInsuredResaleRoutes(rfq: RfqScenario, market: string): ShippingOption[] {
+  const origin = rfq.origin || "Seller location";
+  const route = `${origin} -> ${market}`;
+  const marketCost = market === "Japan" ? 110 : market === "Germany" ? 170 : 185;
+
+  return [
+    {
+      id: `dhl-secure-${market.toLowerCase().replace(/\W+/g, "-")}`,
+      route,
+      carrier: "DHL Express",
+      mode: "Tracked air + declared-value cover",
+      days: market === "Japan" ? 2 : 4,
+      costUsd: marketCost,
+      reliability: 0.94,
+      markets: [market]
+    },
+    {
+      id: `fedex-priority-${market.toLowerCase().replace(/\W+/g, "-")}`,
+      route,
+      carrier: "FedEx International Priority",
+      mode: "Tracked air + declared-value cover",
+      days: market === "Japan" ? 3 : 5,
+      costUsd: Math.max(85, marketCost - 24),
+      reliability: 0.91,
+      markets: [market]
+    }
+  ];
 }
 
 export function priceQuote({
@@ -405,7 +509,13 @@ export function assessRisks({
   const risks: QuoteRisk[] = [];
   const runnerUp = productCandidates[1];
 
-  if (selectedProduct.isUncataloged) {
+  if (selectedProduct.requiresAuthentication) {
+    risks.push({
+      level: "high",
+      title: "Independent product verification required",
+      detail: "Ownership, model identifiers, condition, compliance, and supporting evidence must be reviewed before publication."
+    });
+  } else if (selectedProduct.isUncataloged) {
     risks.push({
       level: "high",
       title: "Manual product review",
@@ -413,7 +523,11 @@ export function assessRisks({
     });
   }
 
-  if (rfq.isCustomDraft && /(?:\bi want to sell\b|\bsell it\b|\bresale\b)/i.test(rfq.rawMessage)) {
+  if (
+    rfq.source !== "seller-listing" &&
+    rfq.isCustomDraft &&
+    /(?:\bi want to sell\b|\bsell it\b|\bresale\b)/i.test(rfq.rawMessage)
+  ) {
     risks.push({
       level: "medium",
       title: "Inbound sales intent",
@@ -426,6 +540,18 @@ export function assessRisks({
       level: "high",
       title: "Product ambiguity",
       detail: `${selectedProduct.product.sku} and ${runnerUp.product.sku} are both plausible.`
+    });
+  }
+
+  if (
+    runnerUp &&
+    /\b(?:unless|either|alternative|or)\b/i.test(rfq.rawMessage) &&
+    !risks.some((risk) => risk.title === "Product ambiguity")
+  ) {
+    risks.push({
+      level: "medium",
+      title: "Conditional product requirement",
+      detail: `${selectedProduct.product.sku} is the strongest match, but ${runnerUp.product.sku} was mentioned as a conditional alternative.`
     });
   }
 
@@ -473,6 +599,7 @@ function buildTimeline({
   qwenTrace,
   quote,
   relevantMemories,
+  rfq,
   risks,
   shipping
 }: {
@@ -482,25 +609,37 @@ function buildTimeline({
   qwenTrace: QwenTrace | null;
   quote: Quote;
   relevantMemories: MemoryRecord[];
+  rfq: RfqScenario;
   risks: QuoteRisk[];
   shipping: ScoredShippingOption;
 }): TimelineStep[] {
   const topCandidate = productCandidates[0]!;
-  const productMatchTitle = topCandidate.isUncataloged
-    ? "Created manual review item for uncataloged product"
-    : "Mapped vague buyer language to catalog SKU";
-  const productMatchSummary = topCandidate.isUncataloged
-    ? `${topCandidate.product.name} requires catalog, sourcing, and authenticity review.`
-    : `${topCandidate.product.sku}: ${topCandidate.product.name}`;
+  const productMatchTitle = topCandidate.requiresAuthentication
+    ? "Created a protected seller item record"
+    : topCandidate.isUncataloged
+      ? "Created manual review item for uncataloged product"
+      : "Mapped vague buyer language to catalog SKU";
+  const productMatchSummary = topCandidate.requiresAuthentication
+    ? `${topCandidate.product.name} is ready for independent product verification.`
+    : topCandidate.isUncataloged
+      ? `${topCandidate.product.name} requires catalog, sourcing, and authenticity review.`
+      : `${topCandidate.product.sku}: ${topCandidate.product.name}`;
+  const sellerIntake = rfq.source === "seller-listing";
 
   return [
     {
       id: "rfq-parser",
-      role: qwenTrace?.status === "live" ? "Qwen RFQ Parser" : "RFQ Parser",
+      role: qwenTrace?.status === "live"
+        ? sellerIntake ? "Qwen Seller Intake" : "Qwen RFQ Parser"
+        : sellerIntake ? "Seller Intake Parser" : "RFQ Parser",
       title:
         qwenTrace?.status === "live"
-          ? "Qwen converted multilingual text into quote fields"
-          : "Converted message into a structured request",
+          ? sellerIntake
+            ? "Qwen structured the seller's item and sale intent"
+            : "Qwen converted multilingual text into quote fields"
+          : sellerIntake
+            ? "Converted seller details into a protected intake"
+            : "Converted message into a structured request",
       confidence: qwenTrace?.status === "live" ? parsed.confidence || 0.88 : 0.92,
       summary: `${parsed.quantity} units for ${parsed.destination}, deadline in ${parsed.deadlineDays} days.`,
       evidence: [
@@ -510,7 +649,7 @@ function buildTimeline({
       ],
       toolReads:
         qwenTrace?.status === "live"
-          ? [qwenTrace.model || "qwen3.6-flash", "rfq_message", "catalog_context"]
+          ? [qwenTrace.model || "qwen3.7-plus", "rfq_message", "catalog_context"]
           : ["deterministic_parser", "rfq_message"],
       executionType: qwenTrace?.status === "live" ? "qwen-cloud" : "resilient-fallback"
     },
@@ -596,17 +735,34 @@ function buildDraftEmail({
   parsed,
   quote,
   risks,
+  rfq,
   shipping
 }: {
   customer: Customer;
   parsed: ParsedRfq;
   quote: Quote;
   risks: QuoteRisk[];
+  rfq: RfqScenario;
   shipping: ScoredShippingOption;
 }): string {
   const riskSentence = risks.length
     ? "I have included a note below for one item that needs confirmation before release."
     : "Everything is ready for approval and order release.";
+
+  if (rfq.source === "seller-listing") {
+    return [
+      `Dear ${customer.contact},`,
+      "",
+      `Your ${quote.productName} has been saved as a private seller intake.`,
+      `Your asking price is ${formatUsd(quote.unitPrice)}. Estimated insured shipping to ${customer.market} is ${formatUsd(quote.shippingCost)} via ${shipping.carrier}.`,
+      `The buyer-facing landed estimate is ${formatUsd(quote.landedTotal)}. Nothing will be published before product verification and your approval.`,
+      "",
+      riskSentence,
+      "",
+      "Best regards,",
+      "QuoteX Seller Desk"
+    ].join("\n");
+  }
 
   return [
     `Dear ${customer.contact},`,
@@ -629,6 +785,20 @@ function buildDraftEmail({
 }
 
 function buildMemoryWrite(analysis: Analysis): MemoryRecord {
+  if (analysis.rfq.source === "seller-listing") {
+    return {
+      id: `mem-${analysis.rfq.id}-${Date.now()}`,
+      type: "approval_outcome",
+      title: `Approved ${analysis.quote.productName} seller intake at ${formatUsd(analysis.quote.unitPrice)}`,
+      evidence: `Product-verification checkpoint retained and ${analysis.shipping.carrier} selected for the ${analysis.customer.market} target market.`,
+      confidence: 0.9,
+      sku: analysis.quote.sku,
+      acceptedUnitPriceUsd: analysis.quote.unitPrice,
+      acceptedCarrier: analysis.shipping.carrier,
+      updatedAt: new Date().toISOString().slice(0, 10)
+    };
+  }
+
   const shippingPreference = `${analysis.customer.company} accepted ${analysis.shipping.carrier} for ${analysis.rfq.destination}.`;
 
   return {
@@ -658,6 +828,10 @@ function extractProductName(message: string, hints: string[] = []): string {
   const withoutPrice = message.replace(/(?:\$|usd\s*)\s*\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s*(?:usd|dollars|\$)/gi, "");
   const firstClause = withoutPrice
     .split(/[.!?\n]/)[0]
+    .replace(
+      /^\s*(?:i\s+(?:want|would like)\s+to\s+)?sell\s+\d[\d,]*\s+(?:items?\s*:?\s*)?(?:an?\s+)?/i,
+      ""
+    )
     .replace(/\b(i want to|please|can you|need|quote|sell it|brand new condition)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -698,9 +872,9 @@ function computeDiscount(customer: Customer, memories: MemoryRecord[]): number {
   return Math.min(discount, 0.06);
 }
 
-function extractQuantity(message: string): number | null {
+export function extractExplicitQuantity(message: string): number | null {
   const unitMatch = message.match(
-    /(\d{1,6})\s*(units|pcs|pieces|個|台|sets|boards|controllers|items|bags)/i
+    /(\d{1,3}(?:,\d{3})*|\d{1,6})\s*(units|pcs|pieces|個|台|sets|boards|controllers|items|bags|scarves|garments|products)/i
   );
 
   if (unitMatch) {
@@ -708,7 +882,7 @@ function extractQuantity(message: string): number | null {
   }
 
   const intentMatch = message.match(
-    /(?:qty|quantity|quote|need|order|purchase|prepare price for|price for)\D{0,32}(\d{1,6})(?![\d,]*\s*(?:usd|dollars|\$))/i
+    /(?:qty|quantity|quote|need|order|purchase|prepare price for|price for)\D{0,32}(\d{1,3}(?:,\d{3})*|\d{1,6})(?![\d,]*\s*(?:usd|dollars|\$))/i
   );
 
   return intentMatch ? Number(intentMatch[1].replaceAll(",", "")) : null;
@@ -727,8 +901,10 @@ function extractDeadlineDays(message: string): number | null {
 }
 
 function extractFreightCeiling(message: string): number | null {
-  const match = message.match(/(?:above|under|below|over)\s*(\d{2,5})\s*(?:usd|dollars|\$)?/i);
-  return match ? Number(match[1]) : null;
+  const match = message.match(
+    /(?:above|under|below|over)\s*(?:(?:usd|dollars|\$)\s*)?(\d{2,3}(?:,\d{3})*|\d{2,5})\s*(?:usd|dollars|\$)?/i
+  );
+  return match ? Number(match[1].replaceAll(",", "")) : null;
 }
 
 function extractTerms(message: string): string {
@@ -749,11 +925,15 @@ function scoreMemory(memory: MemoryRecord, normalizedMessage: string): number {
   const memoryTerms = text.split(" ").filter((term) => term.length > 4);
   const overlap = memoryTerms.filter((term) => normalizedMessage.includes(term)).length;
   const typeBoost =
-    memory.type.includes("shipping") && /ship|freight|dhl|delivery|送料/.test(normalizedMessage)
+    memory.type.includes("shipping") &&
+    overlap > 0 &&
+    /ship|freight|dhl|delivery|送料/.test(normalizedMessage)
       ? 0.42
       : 0;
   const commercialBoost =
-    memory.type.includes("commercial") && /payment|terms|net|支払い/.test(normalizedMessage)
+    memory.type.includes("commercial") &&
+    overlap > 0 &&
+    /payment|terms|net|支払い/.test(normalizedMessage)
       ? 0.35
       : 0;
   const priorOutcomeBoost =
@@ -772,6 +952,35 @@ function normalize(value: unknown): string {
     .replace(/[^\p{L}\p{N}\s.-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function phrasePolarityAdjustment(message: string, phrase: string): number {
+  const index = message.indexOf(phrase);
+  if (index < 0) return 0;
+
+  const before = message.slice(Math.max(0, index - 42), index);
+  const after = message.slice(index + phrase.length, index + phrase.length + 28);
+  if (/\b(?:unless|without|exclude|excluding|avoid|instead of)\b[^.]{0,24}$/.test(before)) {
+    return -0.42;
+  }
+  if (/\bnot\b[^.]{0,18}$/.test(before) || /^\s*(?:is\s+)?not\b/.test(after)) {
+    return -0.5;
+  }
+  if (/\b(?:if|required|alternative|optional)\b/.test(after)) {
+    return -0.2;
+  }
+  return 0;
+}
+
+function explicitProductIntentBoost(product: Product, message: string): number {
+  const productText = normalize(`${product.name} ${product.category} ${product.aliases.join(" ")}`);
+  if (/\b(?:need|want|use|quote)\s+(?:the\s+|a\s+|an\s+)?controller\b/.test(message)) {
+    return /\bcontrol(?:ler)?\b/.test(productText) ? 0.34 : 0;
+  }
+  if (/\b(?:need|want|use|quote)\s+(?:the\s+|a\s+|an\s+)?driver\b/.test(message)) {
+    return /\bdriver\b/.test(productText) ? 0.34 : 0;
+  }
+  return 0;
 }
 
 function roundMoney(value: number): number {

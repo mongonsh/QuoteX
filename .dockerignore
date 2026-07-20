@@ -1,7 +1,11 @@
 .git
 .env
 .DS_Store
+.runtime
 coverage
+demo
+diagrams
 dist
+docs
 node_modules
 npm-debug.log*

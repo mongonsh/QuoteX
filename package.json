@@ -11,8 +11,26 @@
     "start": "npm run build && node dist/tools/serve.js",
     "find:qwen-model": "npm run build && node dist/tools/find-qwen-model.js",
     "probe:qwen-image": "npm run build && node dist/tools/probe-qwen-image.js",
+    "probe:happyhorse": "npm run build && node dist/tools/probe-happyhorse.js",
     "probe:qwen": "npm run build && node dist/tools/probe-qwen.js",
-    "test": "npm run build && node dist/tests/run-tests.js"
+    "render:cinematic-demo": "node demo/cinematic/render.mjs",
+    "render:motion-demo": "node demo/motion/render.mjs",
+    "render:motion-preview": "node demo/motion/render.mjs --preview 12",
+    "render:motion-stills": "node demo/motion/render.mjs --stills",
+    "generate:motion-narration": "PYTHONPATH=.runtime/python python3 demo/motion/generate-narration.py --force",
+    "motion:studio": "node demo/motion/prepare-assets.mjs && remotion studio demo/motion/src/index.jsx --public-dir=demo/motion/public",
+    "security:scan": "node tools/check-repository-secrets.mjs",
+    "test": "npm run build && node dist/tests/run-tests.js",
+    "benchmark": "npm run build && node dist/tools/benchmark-agent.js",
+    "evaluate": "npm run build && node dist/tools/evaluate-agent.js",
+    "verify:submission": "npm run security:scan && npm run build && node dist/tools/verify-submission.js",
+    "deploy:prepare": "npm run build && node dist/tools/prepare-alibaba-deployment.js",
+    "image:plan": "npm run build && node dist/tools/publish-alibaba-image.js",
+    "image:publish": "npm run build && node dist/tools/publish-alibaba-image.js --apply",
+    "provision:plan": "npm run build && node dist/tools/provision-alibaba-cloud.js",
+    "provision:alibaba": "npm run build && node dist/tools/provision-alibaba-cloud.js --apply",
+    "deploy:plan": "npm run build && node dist/tools/deploy-alibaba-fc.js",
+    "deploy:fc": "npm run build && node dist/tools/deploy-alibaba-fc.js --apply"
   },
   "keywords": [
     "qwen",
@@ -22,11 +40,38 @@
     "rfq"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.15"
+  },
+  "overrides": {
+    "tablestore": {
+      "buffer": "6.0.3",
+      "protobufjs": "7.6.5"
+    }
   },
   "license": "MIT",
   "devDependencies": {
+    "@alicloud/cr20181201": "^2.2.0",
+    "@alicloud/credentials": "^2.4.5",
+    "@alicloud/fc20230330": "^4.7.6",
+    "@alicloud/openapi-client": "^0.4.15",
+    "@alicloud/ram20150501": "^1.2.1",
+    "@alicloud/sls20201230": "^5.10.1",
+    "@alicloud/sts20150401": "^1.2.0",
+    "@alicloud/tablestore20201209": "^3.2.0",
+    "@alicloud/tea-util": "^1.4.11",
+    "@remotion/bundler": "4.0.491",
+    "@remotion/cli": "4.0.491",
+    "@remotion/renderer": "4.0.491",
     "@types/node": "^26.1.1",
+    "ffmpeg-static": "^5.3.0",
+    "playwright": "^1.61.1",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "remotion": "4.0.491",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "ali-oss": "^6.23.0",
+    "tablestore": "^5.6.5"
   }
 }

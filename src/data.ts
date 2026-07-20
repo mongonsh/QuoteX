@@ -2,38 +2,46 @@ import type { Customer, PricingRules, Product, RfqScenario, ShippingOption } fro
 
 export const customers: Customer[] = [
   {
-    id: "mori-lighting",
-    company: "Mori Lighting Co.",
-    contact: "Aiko Tanaka",
-    market: "Japan",
-    language: "Japanese / English",
+    id: "nordlicht-retail",
+    company: "Nordlicht Concept Stores GmbH",
+    contact: "Lea Hoffmann",
+    market: "Germany",
+    language: "English",
     paymentTerms: "Net 30",
-    creditLimitUsd: 92000,
+    creditLimitUsd: 120000,
     relationship: "Repeat buyer",
     memory: [
       {
-        id: "mem-dhl-speed",
+        id: "mem-dhl-economy",
         type: "shipping_preference",
-        title: "Prefers DHL Express when freight is under USD 420",
-        evidence: "Accepted SO-4821 after sea freight was replaced with DHL.",
-        confidence: 0.91,
-        updatedAt: "2026-06-21"
+        title: "Prefers DHL Economy Select when freight stays under USD 1,000",
+        evidence: "Accepted the DHL economy route on PO-1842 for the Berlin distribution center.",
+        confidence: 0.94,
+        updatedAt: "2026-06-24"
       },
       {
-        id: "mem-payment",
+        id: "mem-nordlicht-payment",
         type: "commercial_preference",
-        title: "Requests Net 30 terms on every repeat order",
-        evidence: "Mentioned in three approved quotes since May.",
-        confidence: 0.88,
-        updatedAt: "2026-06-28"
+        title: "Uses Net 30 payment terms for approved repeat orders",
+        evidence: "Net 30 was approved on the last three wholesale cashmere orders.",
+        confidence: 0.92,
+        updatedAt: "2026-06-29"
       },
       {
-        id: "mem-packaging",
+        id: "mem-plastic-free-packaging",
         type: "fulfillment_preference",
-        title: "Needs carton labels in Japanese for warehouse receiving",
-        evidence: "Warehouse rejected unlabeled cartons on SO-4690.",
-        confidence: 0.84,
-        updatedAt: "2026-05-30"
+        title: "Requires plastic-free paper sleeves and carton labels by color",
+        evidence: "Berlin receiving approved the packaging standard on PO-1842.",
+        confidence: 0.95,
+        updatedAt: "2026-06-24"
+      },
+      {
+        id: "mem-origin-documents",
+        type: "compliance_preference",
+        title: "Needs fiber composition and Mongolian certificate of origin before purchase order",
+        evidence: "Compliance requested both documents during the previous order review.",
+        confidence: 0.93,
+        updatedAt: "2026-06-25"
       }
     ]
   },
@@ -81,10 +89,33 @@ export const customers: Customer[] = [
 
 export const products: Product[] = [
   {
+    sku: "MNG-CASH-SCF",
+    name: "Grade-A Mongolian Cashmere Scarf",
+    category: "Apparel and textiles",
+    aliases: [
+      "mongolian cashmere scarf",
+      "cashmere scarves",
+      "grade-a cashmere",
+      "cashmere wrap",
+      "wholesale scarf"
+    ],
+    hsCode: "6214.20",
+    origin: "MN",
+    stock: 1600,
+    unitCostUsd: 36,
+    listPriceUsd: 68,
+    leadTimeDays: 8,
+    moq: 100,
+    certification: [
+      "100% cashmere composition report",
+      "Mongolian certificate of origin"
+    ]
+  },
+  {
     sku: "AUR-CTRL-24",
     name: "Aurora 24V LED Control Board",
     category: "Lighting electronics",
-    aliases: ["aurora board", "aurora control", "24v controller", "同じ基板", "基板", "same board"],
+    aliases: ["aurora board", "aurora control", "24v controller", "control board", "same board"],
     hsCode: "8537.10",
     origin: "CN",
     stock: 1240,
@@ -187,7 +218,8 @@ export const shippingOptions: ShippingOption[] = [
     days: 5,
     costUsd: 548,
     reliability: 0.92,
-    markets: ["Germany"]
+    markets: ["Germany"],
+    customerIds: ["alba-industries"]
   },
   {
     id: "rail-cn-de",
@@ -197,35 +229,72 @@ export const shippingOptions: ShippingOption[] = [
     days: 19,
     costUsd: 286,
     reliability: 0.84,
-    markets: ["Germany"]
+    markets: ["Germany"],
+    customerIds: ["alba-industries"]
+  },
+  {
+    id: "dhl-mn-de-economy",
+    route: "Ulaanbaatar -> Berlin",
+    carrier: "DHL Economy Select",
+    mode: "Consolidated air",
+    days: 12,
+    costUsd: 820,
+    reliability: 0.91,
+    markets: ["Germany"],
+    customerIds: ["nordlicht-retail"]
+  },
+  {
+    id: "dhl-mn-de-express",
+    route: "Ulaanbaatar -> Berlin",
+    carrier: "DHL Express",
+    mode: "Priority air",
+    days: 5,
+    costUsd: 1480,
+    reliability: 0.96,
+    markets: ["Germany"],
+    customerIds: ["nordlicht-retail"]
+  },
+  {
+    id: "cargo-mn-de",
+    route: "Ulaanbaatar -> Berlin",
+    carrier: "MIAT Cargo",
+    mode: "Scheduled air cargo",
+    days: 8,
+    costUsd: 960,
+    reliability: 0.88,
+    markets: ["Germany"],
+    customerIds: ["nordlicht-retail"]
   }
 ];
 
 export const rfqScenarios: RfqScenario[] = [
   {
-    id: "mori-repeat-500",
-    customerId: "mori-lighting",
-    receivedAt: "2026-07-07T09:18:00+09:00",
-    channel: "Email",
-    subject: "同じ基板を500個、来週金曜まで",
+    id: "nordlicht-cashmere-500",
+    customerId: "nordlicht-retail",
+    receivedAt: "2026-07-18T09:18:00+02:00",
+    channel: "Buyer email",
+    subject: "500 Mongolian cashmere scarves for Berlin",
     rawMessage:
-      "田中です。前回と同じAurora用の基板を500個お願いします。来週金曜までに横浜倉庫へ。送料は安い方がいいですが、遅れるならDHLでもOKです。支払いはいつものNet 30で見積ください。",
+      "Hello, please quote 500 Grade-A Mongolian cashmere scarves for our Berlin stores: 200 charcoal, 150 forest green, and 150 natural oat. Use plastic-free paper sleeves and carton labels by color. Deliver DDP Berlin within 21 days. Keep freight under USD 1,000 and use our usual payment terms. Include the fiber composition report and Mongolian certificate of origin.",
     expectedQuantity: 500,
-    destination: "Yokohama warehouse",
-    deadlineDays: 7,
-    priority: "High"
+    origin: "Ulaanbaatar, Mongolia",
+    destination: "Berlin distribution center",
+    deadlineDays: 21,
+    priority: "High",
+    demoLabel: "Start here"
   },
   {
-    id: "mori-memory-replay",
-    customerId: "mori-lighting",
-    receivedAt: "2026-07-08T08:45:00+09:00",
-    channel: "Email",
-    subject: "前回と同じ条件で追加800個",
+    id: "nordlicht-cashmere-replay",
+    customerId: "nordlicht-retail",
+    receivedAt: "2026-07-19T08:45:00+02:00",
+    channel: "Buyer email",
+    subject: "Repeat order for 800 cashmere scarves",
     rawMessage:
-      "田中です。前回承認したAurora基板を追加で800個お願いします。同じ支払い条件と配送判断で、横浜倉庫へ10日以内に届く見積をください。",
+      "Please repeat the approved cashmere scarf order for 800 units: 300 charcoal, 250 forest green, and 250 natural oat. Use the previous plastic-free packaging, payment terms, and freight decision. Deliver DDP Berlin within 24 days and include the same origin documents.",
     expectedQuantity: 800,
-    destination: "Yokohama warehouse",
-    deadlineDays: 10,
+    origin: "Ulaanbaatar, Mongolia",
+    destination: "Berlin distribution center",
+    deadlineDays: 24,
     priority: "High",
     demoLabel: "Memory replay"
   },

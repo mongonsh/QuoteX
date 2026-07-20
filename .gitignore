@@ -1,5 +1,11 @@
 .env
+env.txt
 .DS_Store
 node_modules/
 coverage/
 dist/
+__pycache__/
+*.py[cod]
+.gstack/
+.runtime/
+demo/motion/public/generated/

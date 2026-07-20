@@ -1,4 +1,5 @@
 import { loadConfig } from "../server/config.js";
+import { makeProductTestPngDataUrl } from "./product-test-image.js";
 
 const DOC_URL = "https://www.alibabacloud.com/help/en/model-studio/qwen-image-edit-api";
 const config = await loadConfig();
@@ -42,7 +43,7 @@ async function probeImageEdit() {
               role: "user",
               content: [
                 {
-                  image: makeBmpDataUrl(512, 512)
+                  image: makeProductTestPngDataUrl()
                 },
                 {
                   text:
@@ -75,7 +76,10 @@ async function probeImageEdit() {
       message,
       imageUrl: imageUrl || null,
       requestId: parsed?.request_id || null,
-      hint: response.ok && imageUrl ? "Qwen-Image Edit is working for this endpoint." : hintFor(response.status, message)
+      hint:
+        response.ok && imageUrl
+          ? "Qwen-Image Edit is working for this endpoint."
+          : hintFor(response.status, message)
     };
   } catch (error) {
     return {
@@ -88,44 +92,6 @@ async function probeImageEdit() {
         "Could not reach the configured image endpoint. Check QWEN_IMAGE_BASE_URL, network access, and the workspace region."
     };
   }
-}
-
-function makeBmpDataUrl(width: number, height: number): string {
-  const rowSize = Math.ceil((width * 3) / 4) * 4;
-  const pixelBytes = rowSize * height;
-  const offset = 54;
-  const buffer = Buffer.alloc(offset + pixelBytes);
-
-  buffer.write("BM", 0, "ascii");
-  buffer.writeUInt32LE(buffer.length, 2);
-  buffer.writeUInt32LE(offset, 10);
-  buffer.writeUInt32LE(40, 14);
-  buffer.writeInt32LE(width, 18);
-  buffer.writeInt32LE(height, 22);
-  buffer.writeUInt16LE(1, 26);
-  buffer.writeUInt16LE(24, 28);
-  buffer.writeUInt32LE(pixelBytes, 34);
-  buffer.writeInt32LE(2835, 38);
-  buffer.writeInt32LE(2835, 42);
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const position = offset + y * rowSize + x * 3;
-      const inProduct = x > 136 && x < 376 && y > 112 && y < 398;
-      const handle = y > 348 && y < 386 && x > 190 && x < 322;
-      const highlight = x > 176 && x < 336 && y > 164 && y < 210;
-      const shade = Math.round(235 - (y / height) * 42);
-      const red = inProduct ? (highlight ? 52 : 24) : shade;
-      const green = inProduct || handle ? 128 : shade + 6;
-      const blue = inProduct || handle ? 119 : shade + 10;
-
-      buffer[position] = blue;
-      buffer[position + 1] = green;
-      buffer[position + 2] = red;
-    }
-  }
-
-  return `data:image/bmp;base64,${buffer.toString("base64")}`;
 }
 
 function hintFor(status: number, message: unknown): string {

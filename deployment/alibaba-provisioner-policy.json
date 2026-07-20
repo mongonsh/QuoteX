@@ -1,0 +1,63 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ots:ListInstance",
+        "ots:InsertInstance",
+        "ots:CreateInstance",
+        "ots:ListTable",
+        "ots:CreateTable"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "oss:GetBucketInfo",
+        "oss:PutBucket",
+        "oss:PutBucketAcl"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "log:GetProject",
+        "log:CreateProject",
+        "log:GetLogStore",
+        "log:CreateLogStore"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ram:GetRole",
+        "ram:CreateRole",
+        "ram:GetPolicy",
+        "ram:CreatePolicy",
+        "ram:ListPoliciesForRole",
+        "ram:AttachPolicyToRole",
+        "ram:PassRole"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "fc:GetFunction",
+        "fc:CreateFunction",
+        "fc:UpdateFunction",
+        "fc:ListTriggers",
+        "fc:CreateTrigger",
+        "fc:UpdateTrigger",
+        "fc:EnableHTTPTriggerAnonymous",
+        "fc:EnableServiceInternetAccess",
+        "fc:EnableServiceSLSLogging"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

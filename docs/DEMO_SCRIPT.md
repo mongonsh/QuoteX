@@ -1,61 +1,121 @@
-# QuoteX judge demo — 3 minutes
+# QuoteX judge demo - 1 minute 42 seconds
 
-## 0:00–0:20 — Problem and promise
+The story is simple: Qwen plans the work, verified tools protect commercial truth, and a person controls the irreversible action.
 
-“Export sales teams receive messy messages, not clean order forms. A buyer may write in Japanese, say ‘the same board,’ add a deadline, and assume old payment terms. QuoteX turns that ambiguity into a governed quote, but it never sends a commercial offer without a human.”
+The primary submission artifact is the motion-led [cinematic judge film](CINEMATIC_DEMO.md).
+This document keeps the detailed narration and evidence checklist used by both the primary film
+and the slower browser-recording backup.
 
-Show the hero and four-stage workflow.
+## Final artifact
 
-## 0:20–1:05 — Live autonomy
+- Local upload-ready file: `.runtime/demo/QuoteX-motion-demo.mp4`
+- Duration: `1:42.50`
+- Video: H.264 High, 1920 x 1080, 30 fps, standard-range BT.709 `yuv420p`
+- Audio: AAC stereo, 48 kHz, soft CosyVoice narration, provided music, and synchronized effects; `-15.0 LUFS` integrated / `-1.5 dBFS` true peak
+- File size: 110,592,401 bytes
+- SHA-256: `77c9d112ef4a20a2734e35957ebf67134f04088e209cb6c63a507e3a8d60ee07`
+- Technical backup: `.runtime/demo/QuoteX-demo-final.mp4`
+- Public URL: replace `<DEMO_VIDEO_URL>` in `docs/DEVPOST_SUBMISSION.md` after upload
 
-1. Select **Mori Lighting — 500 boards**.
-2. Confirm **Live Qwen** and the configured model status.
-3. Click **Run Autopilot**.
-4. Narrate the true boundary labels:
-   - Qwen Cloud extracts the Japanese RFQ.
-   - Verified tools retrieve memory, match the catalog, price the offer, and score freight.
-   - The policy stage stops at the human gate.
-5. Point to the execution-proof cards: model call, autonomous stages, memory leverage, six guardrails, audit ID.
+The MP4 is ignored by Git because it is a local submission artifact. The source repository contains the script, architecture, screenshots, evaluator, and all implementation evidence.
 
-Key line: “I am not using an LLM for arithmetic or policy. Qwen handles ambiguity; deterministic tools handle money and control.”
+## Time-coded shot list
 
-## 1:05–1:35 — Inspectability and human control
+### 0:00-0:14 - Real buyer input
 
-1. Open **Quote** and show landed total, margin, freight, and terms.
-2. Open **Qwen Trace** and show model, endpoint host, latency, tokens, sanitized prompt, and normalized response.
-3. Return to **Workbench** and approve.
+Show a Berlin retailer requesting 500 Grade-A Mongolian cashmere scarves. The request combines
+three colors, plastic-free packaging, a freight ceiling, a 21-day target, and origin documents.
+The visible journey is **Understand, Verify, Approve, Prepare**.
 
-Key line: “There is deliberately no autonomous send endpoint. Approval is the only event that can write experience.”
+Narration establishes the pain: cross-border work begins with messy voice notes, product photos,
+and ambiguous messages rather than a complete form.
 
-## 1:35–2:05 — Memory that changes the next run
+### 0:14-0:32 - Governed Qwen agent
 
-1. Click **Test the next RFQ with this memory**.
-2. Run the 800-unit follow-up.
-3. Show the new approved-outcome memory and the memory-impact card.
-4. Open **Memory** to show evidence, confidence, retention policy, and the clear control.
+Open **Agent evidence** and show the six typed skills. Each row exposes whether Qwen selected it, the trusted result, and execution time.
 
-Key line: “This is cross-session memory, not a static timeline animation. Refresh the browser and the approved outcome remains available.”
+Key claim: Qwen may propose a tool call, but it cannot invent a SKU, set the commercial price, or send an offer.
 
-## 2:05–2:30 — Multimodal Qwen
+### 0:32-0:44 - Measurable evidence
 
-1. Open **Creative**.
-2. Upload a product image.
-3. Generate the campaign creative.
-4. Show Qwen's brief and Qwen-Image Edit result or the clearly labeled fallback.
+Show the trust boundary and the checked-in adversarial result:
 
-## 2:30–3:00 — Production readiness
+- Governed Qwen tool agent: `42 / 42`
+- Direct one-prompt Qwen baseline: `28 / 42`
+- Difference: `+33.3` percentage points
 
-Show the architecture diagram and Alibaba Cloud proof recording.
+These are six declared adversarial fixtures, not a production business KPI.
 
-“QuoteX ships as an AMD64 container for Function Compute, listens on the required port, exposes a secret-safe health check, has prompt-injection defenses and security headers, and degrades visibly. The result is a product teams can trust, not a toy agent that hides its failures.”
+### 0:44-0:54 - Human checkpoint
 
-End on the approved quote and audit ID.
+Open **Offer** and show the recomputed `$33,630` landed total, DHL Economy Select route, Net 30
+terms, 45% gross margin, and pending approval. Nothing has been sent or published.
 
-## Demo safety checklist
+### 0:54-1:04 - AI campaign asset
 
-- Run `npm test` immediately before recording.
-- Verify `/api/health` says `configured: true`.
-- Run the exact Mori flow once to warm the service.
-- Use a non-sensitive product image under 5 MB.
-- Keep **Resilient demo** available, but do not present it as live Qwen.
-- Never show `.env`, API key values, browser storage, or cloud credentials.
+Open **Campaign** and show the cashmere source photo beside the generated campaign image. The
+image was produced by the live configured Qwen/Wan route during recording preflight.
+
+### 1:04-1:13 - Marketplace adapters
+
+Show the Amazon, eBay, and Alibaba.com drafts. They are validation-first payloads with platform-specific fields and warnings. They are not published listings.
+
+### 1:13-1:23 - Grounded voice assistant
+
+Show the prepared “When would 500 scarves arrive in Berlin?” exchange. The activity rail visibly
+confirms:
+
+- Qwen3-ASR-Flash input route
+- Qwen3.7 grounded answer
+- CosyVoice output ready
+- Human checkpoint still locked
+
+### 1:23-1:32 - Graceful degradation
+
+Switch to **Resilient demo**. The same six trusted skills run with zero model turns, every completion is labeled as a guardrail action, and the send gate remains closed.
+
+### 1:32-1:42 - Architecture close
+
+End on the architecture diagram: validated input, bounded Qwen planner, six commerce skills, SQLite evidence, risk policy, human approval, and downstream media or marketplace drafts.
+
+Final line:
+
+“Qwen plans. Verified tools decide facts. A human controls the commercial action.”
+
+## Narration
+
+The primary film uses nine concise, scene-timed passages. The exact text, starts, voice
+configuration, timing guard, WAV normalization, and mix are versioned in
+`demo/motion/generate-narration.py`.
+
+The closing line is:
+
+> Qwen plans, verified tools decide, and a human controls the action.
+
+## Final QA
+
+- Live agent, campaign image, customer answer, and designed voice all passed recording preflight.
+- No page exceptions or failed application requests occurred in the visible take.
+- The only browser console message was a harmless `/favicon.ico` 404 after opening the final SVG.
+- Qwen streaming WAV sentinel lengths are normalized to actual RIFF/data sizes before browser playback.
+- Signed audio downloads retry only transient network, timeout, rate-limit, and 5xx failures.
+- Frame sampling confirms the request, tool trace, score, offer, campaign, marketplace, voice, fallback, and architecture scenes.
+- Audio measures `-14.9 LUFS` integrated and `-1.4 dBFS` true peak.
+- No freeze interval persisted for 0.8 seconds and no black frame persisted for 0.5 seconds.
+- The delivery file is tagged standard-range BT.709 and decodes end to end without errors.
+
+## Upload checklist
+
+1. Upload `.runtime/demo/QuoteX-motion-demo.mp4` to YouTube as **Unlisted** or to another Devpost-supported public video host.
+2. Use the title `QuoteX - Governed Qwen Commerce Agent | 102-second Demo`.
+3. Confirm playback in a signed-out/private browser window.
+4. Replace `<DEMO_VIDEO_URL>` in `docs/DEVPOST_SUBMISSION.md`.
+5. Run `npm run verify:submission`; all 12 checks must pass.
+
+## Recording rules
+
+- Never show an API key, account ID, environment value, or private endpoint.
+- Use only English example data.
+- Do not call marketplace drafts published listings.
+- Do not call fixture benchmark numbers production outcomes or human-time savings.
+- Do not present **Resilient demo** as **Live Qwen**.

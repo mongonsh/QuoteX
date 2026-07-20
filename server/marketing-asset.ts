@@ -24,7 +24,7 @@ interface NormalizedMarketingPayload {
   media: UploadedMedia;
   product: Pick<Product, "sku" | "name" | "category" | "certification" | "hsCode">;
   quote: Partial<Quote> | null;
-  rfq: Pick<RfqScenario, "subject" | "destination" | "rawMessage">;
+  rfq: Pick<RfqScenario, "subject" | "destination" | "rawMessage" | "source">;
 }
 
 interface MarketingResult {
@@ -39,12 +39,17 @@ interface BriefSuccess {
   model?: string;
   prompt: string;
   usage?: QwenUsage;
+  groundedInPhoto: boolean;
 }
 
 interface ImageEditSuccess {
   ok: true;
   imageUrl: string;
+  imageDataUrl: string;
+  mimeType: string;
   model: string;
+  attemptedModels: string[];
+  assetPersistence: "embedded-data-url" | "provider-url";
   prompt: string;
   usage: QwenUsage | null;
   requestId: string | null;
@@ -68,6 +73,9 @@ const RESPONSE_SCHEMA = {
   },
   complianceNotes: "string[]"
 };
+
+const IMAGE_EDIT_MAX_ATTEMPTS = 3;
+const IMAGE_EDIT_RETRY_BASE_MS = 750;
 
 export async function generateMarketingAsset({
   config,
@@ -95,22 +103,32 @@ export async function generateMarketingAsset({
       ok: true,
       asset: buildQwenImageAsset({
         brief,
+        imageDataUrl: imageEdit.imageDataUrl,
         imageUrl: imageEdit.imageUrl,
+        mimeType: imageEdit.mimeType,
         media: normalized.media,
-        product: normalized.product
+        product: normalized.product,
+        model: imageEdit.model
       }),
       trace: {
         status: "live-image-edit",
         model: imageEdit.model || config.qwen.imageModel,
-        briefingModel: (liveBrief.ok ? liveBrief.model : undefined) || config.qwen.marketingModel,
+        briefingModel: (liveBrief.ok ? liveBrief.model : undefined) || config.qwen.visionModel,
         endpointHost: safeHost(config.qwen.imageEndpoint),
         elapsedMs,
         usage: imageEdit.usage || null,
         requestId: imageEdit.requestId || null,
+        attemptedModels: imageEdit.attemptedModels,
+        inputGrounding: liveBrief.ok && liveBrief.groundedInPhoto
+          ? `Uploaded product photo analyzed by ${liveBrief.model || config.qwen.visionModel}`
+          : "Structured RFQ and product facts",
+        assetPersistence: imageEdit.assetPersistence,
         prompt: imageEdit.prompt,
         response: {
           brief,
-          imageUrl: imageEdit.imageUrl
+          imageUrl: imageEdit.imageUrl,
+          modelRoute: imageEdit.attemptedModels,
+          assetPersistence: imageEdit.assetPersistence
         }
       }
     };
@@ -127,29 +145,29 @@ export async function generateMarketingAsset({
   return {
     ok: true,
     asset,
-    trace: liveBrief.ok
-      ? {
-          status: "live",
-          model: liveBrief.model || config.qwen.marketingModel,
-          endpointHost: safeHost(config.qwen.baseUrl),
-          elapsedMs,
-          usage: liveBrief.usage || null,
-          prompt: liveBrief.prompt,
-          response: brief
-        }
-      : {
-          status: config.qwen.imageApiKey || config.qwen.apiKey ? "fallback-edit" : "missing-key",
-          model: config.qwen.imageModel,
-          briefingModel: config.qwen.marketingModel,
-          endpointHost: safeHost(config.qwen.imageEndpoint),
-          elapsedMs,
-          error:
-            imageEdit.error?.message ||
-            liveBrief.error?.message ||
-            "Qwen image edit did not run.",
-          briefingError: liveBrief.error?.message || null,
-          response: brief
-        }
+    trace: {
+      status: config.qwen.imageApiKey || config.qwen.apiKey ? "fallback-edit" : "missing-key",
+      model: config.qwen.imageModel,
+      briefingModel:
+        (liveBrief.ok ? liveBrief.model : undefined) || config.qwen.visionModel,
+      endpointHost: safeHost(config.qwen.imageEndpoint),
+      elapsedMs,
+      usage: liveBrief.ok ? liveBrief.usage || null : null,
+      attemptedModels:
+        config.qwen.imageApiKey || config.qwen.apiKey
+          ? uniqueModels([config.qwen.imageModel, config.qwen.imageFallbackModel])
+          : [],
+      prompt: liveBrief.ok ? liveBrief.prompt : undefined,
+      inputGrounding: liveBrief.ok
+        ? `Uploaded product photo analyzed by ${liveBrief.model || config.qwen.visionModel}`
+        : "Local continuity layout",
+      error:
+        imageEdit.error?.message ||
+        (!liveBrief.ok ? liveBrief.error?.message : "") ||
+        "Qwen image edit did not run.",
+      briefingError: !liveBrief.ok ? liveBrief.error?.message || null : null,
+      response: brief
+    }
   };
 }
 
@@ -174,7 +192,7 @@ async function createBriefWithQwen({
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: config.qwen.marketingModel,
+      model: config.qwen.visionModel,
       messages: [
         {
           role: "system",
@@ -183,12 +201,22 @@ async function createBriefWithQwen({
         },
         {
           role: "user",
-          content: prompt
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: payload.media.dataUrl }
+            },
+            {
+              type: "text",
+              text: prompt
+            }
+          ]
         }
       ],
       temperature: 0.45,
       top_p: 0.85,
-      max_tokens: 700
+      enable_thinking: false,
+      response_format: { type: "json_object" }
     })
   }, config.qwen.timeoutMs);
 
@@ -206,7 +234,8 @@ async function createBriefWithQwen({
     brief: normalizeBrief(extractJson(content)),
     model: data.model,
     prompt,
-    usage: data.usage
+    usage: data.usage,
+    groundedInPhoto: true
   };
 }
 
@@ -230,63 +259,160 @@ async function editImageWithQwen({
   }
 
   const prompt = buildImageEditPrompt({ brief, payload });
-  const { response, data } = await fetchJsonWithTimeout(config.qwen.imageEndpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: config.qwen.imageModel,
-      input: {
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                image: payload.media.dataUrl
-              },
-              {
-                text: prompt
-              }
-            ]
-          }
-        ]
-      },
-      parameters: {
-        n: 1,
-        negative_prompt:
-          "low resolution, distorted product, changed color, fake logo, watermark, text artifacts, extra handles, deformed hardware",
-        prompt_extend: true,
-        watermark: false,
-        size: "1280*720"
-      }
-    })
-  }, config.qwen.timeoutMs);
+  const modelRoute = uniqueModels([config.qwen.imageModel, config.qwen.imageFallbackModel]);
+  const attemptedModels: string[] = [];
+  const failures: string[] = [];
 
-  if (!response.ok || data.code) {
-    const message = data?.message || data?.error?.message || `Qwen image edit returned ${response.status}`;
-    const error = new Error(message) as Error & { status: number };
-    error.status = response.status;
-    throw error;
+  for (const model of modelRoute) {
+    attemptedModels.push(model);
+    for (let attempt = 1; attempt <= IMAGE_EDIT_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const { response, data } = await fetchJsonWithTimeout(config.qwen.imageEndpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(buildImageEditRequest({ model, media: payload.media, prompt }))
+        }, config.qwen.timeoutMs);
+
+        if (!response.ok || data.code) {
+          const message = data?.message || data?.error?.message || `HTTP ${response.status}`;
+          if (
+            attempt < IMAGE_EDIT_MAX_ATTEMPTS &&
+            isTransientImageFailure(response.status, message)
+          ) {
+            await waitForRetry(attempt);
+            continue;
+          }
+          failures.push(`${model}: ${message}`);
+          break;
+        }
+
+        const imageUrl = data.output?.choices?.[0]?.message?.content?.find(
+          (item: { image?: string }) => item.image
+        )?.image;
+
+        if (!imageUrl) {
+          failures.push(`${model}: response did not include an image URL`);
+          break;
+        }
+
+        const downloaded = await downloadGeneratedImage(imageUrl, config.qwen.timeoutMs).catch(
+          () => null
+        );
+
+        return {
+          ok: true,
+          imageUrl,
+          imageDataUrl: downloaded?.dataUrl || imageUrl,
+          mimeType: downloaded?.mimeType || "image/png",
+          model,
+          attemptedModels,
+          assetPersistence: downloaded ? "embedded-data-url" : "provider-url",
+          prompt,
+          usage: data.usage || null,
+          requestId: data.request_id || null
+        };
+      } catch (error) {
+        const failure = toError(error);
+        if (attempt < IMAGE_EDIT_MAX_ATTEMPTS && isTransientImageFailure(0, failure.message)) {
+          await waitForRetry(attempt);
+          continue;
+        }
+        failures.push(`${model}: ${failure.message}`);
+        break;
+      }
+    }
   }
 
-  const imageUrl = data.output?.choices?.[0]?.message?.content?.find(
-    (item: { image?: string }) => item.image
-  )?.image;
+  throw new Error(`Qwen image route failed. ${failures.join(" | ")}`);
+}
 
-  if (!imageUrl) {
-    throw new Error("Qwen image edit response did not include an image URL.");
+function isTransientImageFailure(status: number, message: string): boolean {
+  return (
+    status === 0 ||
+    status === 408 ||
+    status === 409 ||
+    status === 425 ||
+    status === 429 ||
+    status >= 500 ||
+    /timeout|timed out|temporar|rate.?limit|too many|quota.*busy|service unavailable|connection|network|fetch failed/i.test(
+      message
+    )
+  );
+}
+
+async function waitForRetry(attempt: number): Promise<void> {
+  const delayMs = IMAGE_EDIT_RETRY_BASE_MS * 2 ** (attempt - 1);
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+function buildImageEditRequest({
+  model,
+  media,
+  prompt
+}: {
+  model: string;
+  media: UploadedMedia;
+  prompt: string;
+}): Record<string, unknown> {
+  const parameters: Record<string, unknown> = {
+    n: 1,
+    prompt_extend: true,
+    watermark: false,
+    size: "1280*720"
+  };
+
+  if (model.startsWith("qwen-image")) {
+    parameters.negative_prompt =
+      "low resolution, distorted product, changed color, fake logo, watermark, text artifacts, extra handles, deformed hardware";
   }
 
   return {
-    ok: true,
-    imageUrl,
-    model: config.qwen.imageModel,
-    prompt,
-    usage: data.usage || null,
-    requestId: data.request_id || null
+    model,
+    input: {
+      messages: [
+        {
+          role: "user",
+          content: [{ image: media.dataUrl }, { text: prompt }]
+        }
+      ]
+    },
+    parameters
   };
+}
+
+async function downloadGeneratedImage(
+  imageUrl: string,
+  timeoutMs: number
+): Promise<{ dataUrl: string; mimeType: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(imageUrl, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Generated image download returned ${response.status}`);
+
+    const mimeType = response.headers.get("content-type")?.split(";")[0]?.trim() || "";
+    if (!mimeType.startsWith("image/")) throw new Error("Generated asset was not an image");
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > 12_000_000) {
+      throw new Error("Generated image exceeded the 12 MB persistence limit");
+    }
+
+    return {
+      dataUrl: `data:${mimeType};base64,${bytes.toString("base64")}`,
+      mimeType
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function uniqueModels(models: string[]): string[] {
+  return [...new Set(models.map((model) => model.trim()).filter(Boolean))];
 }
 
 async function fetchJsonWithTimeout(
@@ -317,8 +443,12 @@ function buildImageEditPrompt({
   brief: MarketingBrief;
   payload: NormalizedMarketingPayload;
 }): string {
+  const sellerListing = payload.rfq.source === "seller-listing";
+
   return [
-    `Transform the uploaded product photo into a premium 16:9 B2B quote campaign hero image for ${payload.customer.market}.`,
+    sellerListing
+      ? `Transform the uploaded product photo into a polished 16:9 resale campaign image for buyers in ${payload.customer.market}. Match the visual treatment to the product category.`
+      : `Transform the uploaded product photo into a premium 16:9 B2B quote campaign hero image for ${payload.customer.market}.`,
     `Preserve the exact product identity, silhouette, material, color, and visible hardware from the source image.`,
     "Improve lighting, background, composition, and commercial polish. Remove distracting background clutter.",
     "Place the product in a clean premium showroom or editorial product-ad setting with realistic shadows.",
@@ -334,17 +464,27 @@ function buildPrompt({
   quote,
   rfq
 }: NormalizedMarketingPayload): string {
+  const sellerListing = rfq.source === "seller-listing";
+
   return JSON.stringify(
     {
       task:
-        "Create a concise marketing image brief for a cross-border B2B quote follow-up. Use the uploaded product photo as the hero object and produce sales-safe copy.",
+        sellerListing
+          ? "Create a concise resale image brief for a private product listing. Use the uploaded product photo as the hero object and produce factual, verification-safe copy appropriate to its category."
+          : "Create a concise marketing image brief for a cross-border B2B quote follow-up. Use the uploaded product photo as the hero object and produce sales-safe copy.",
       responseSchema: RESPONSE_SCHEMA,
-      constraints: [
-        "Do not claim certifications unless present in product.certification.",
-        "Avoid consumer-style hype; this is a procurement buyer.",
-        "Prefer clear delivery, reliability, and compliance benefits.",
-        "Return palette colors that work with a clean enterprise dashboard aesthetic."
-      ],
+      constraints: sellerListing
+        ? [
+            "Do not claim that the product is authentic, compliant, or verified before human review.",
+            "Do not invent accessories, condition details, provenance, or scarcity claims.",
+            "Keep the copy factual and suitable for a major resale marketplace."
+          ]
+        : [
+            "Do not claim certifications unless present in product.certification.",
+            "Avoid consumer-style hype; this is a procurement buyer.",
+            "Prefer clear delivery, reliability, and compliance benefits.",
+            "Return palette colors that work with a clean enterprise dashboard aesthetic."
+          ],
       customer: {
         company: customer.company,
         market: customer.market,
@@ -369,7 +509,8 @@ function buildPrompt({
       rfq: {
         subject: rfq.subject,
         destination: rfq.destination,
-        message: rfq.rawMessage
+        message: rfq.rawMessage,
+        source: rfq.source
       },
       uploadedMedia: {
         fileName: media.fileName,
@@ -411,12 +552,30 @@ function normalizePayload(payload: MarketingPayload = {}): NormalizedMarketingPa
     rfq: {
       subject: stringOr(payload.rfq?.subject, "Buyer RFQ"),
       destination: stringOr(payload.rfq?.destination, "Destination"),
-      rawMessage: stringOr(payload.rfq?.rawMessage, "")
+      rawMessage: stringOr(payload.rfq?.rawMessage, ""),
+      source: payload.rfq?.source === "seller-listing" ? "seller-listing" : "demo"
     }
   };
 }
 
-function buildFallbackBrief({ customer, product, quote }: NormalizedMarketingPayload): MarketingBrief {
+function buildFallbackBrief({ customer, product, quote, rfq }: NormalizedMarketingPayload): MarketingBrief {
+  if (rfq.source === "seller-listing") {
+    return {
+      headline: fitCopy(`${product.name} for ${customer.market}`, 52),
+      subhead: "Seller-provided details with independent product verification required before publication.",
+      badge: "Verification pending",
+      cta: "Review product",
+      visualPrompt:
+        "Category-appropriate resale campaign with clean commercial lighting, exact product preservation, realistic materials, and no invented brand text.",
+      palette: {
+        background: "#f5f5f2",
+        accent: "#0f766e",
+        ink: "#17171a"
+      },
+      complianceNotes: ["Seller claims remain unverified until the human product-review checkpoint is complete."]
+    };
+  }
+
   const quantity = quote?.quantity ? `${Number(quote.quantity).toLocaleString("en-US")} units` : "RFQ-ready";
   const certification = product.certification?.[0] ? `${product.certification[0]} ready` : "Export ready";
 
@@ -432,31 +591,37 @@ function buildFallbackBrief({ customer, product, quote }: NormalizedMarketingPay
       accent: "#0f766e",
       ink: "#17212f"
     },
-    complianceNotes: ["Fallback visual edit used because live Qwen image generation was unavailable."]
+    complianceNotes: ["Local continuity layout used; no AI image was generated for this preview."]
   };
 }
 
 function buildQwenImageAsset({
   brief,
+  imageDataUrl,
   imageUrl,
+  mimeType,
   media,
-  product
+  product,
+  model
 }: {
   brief: MarketingBrief;
+  imageDataUrl: string;
   imageUrl: string;
+  mimeType: string;
   media: UploadedMedia;
   product: NormalizedMarketingPayload["product"];
+  model: string;
 }): MarketingAsset {
   return {
-    imageDataUrl: imageUrl,
+    imageDataUrl,
     imageUrl,
-    mimeType: "image/png",
+    mimeType,
     fileName: `${slugify(product.sku)}-qwen-edit.png`,
     brief: {
       ...brief,
       complianceNotes: [
         ...(brief.complianceNotes || []),
-        "Generated by Qwen-Image Edit from the uploaded product photo."
+        `Generated by ${model} from the uploaded product photo.`
       ]
     },
     sourceMedia: {
@@ -550,7 +715,7 @@ function renderMarketingSvg({
     <image href="${escapeXml(imageHref)}" x="26" y="26" width="374" height="374" preserveAspectRatio="xMidYMid slice" filter="url(#adEdit)" clip-path="url(#productClip)"/>
     <rect width="426" height="426" rx="28" fill="url(#shine)"/>
     <rect x="24" y="356" width="202" height="34" rx="17" fill="#ffffff" opacity="0.9"/>
-    <text x="125" y="378" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="850" fill="${accent}">AI edited preview</text>`
+    <text x="125" y="378" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="850" fill="${accent}">Local layout preview</text>`
         : `<text x="213" y="214" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="850" fill="#637083">${escapeXml(product.name)}</text>`
     }
     <rect width="426" height="426" rx="28" fill="none" stroke="#d9e0e8"/>
@@ -572,7 +737,7 @@ function renderMarketingSvg({
       mimeType: media.mimeType,
       sizeBytes: media.sizeBytes
     },
-    visualMode: imageHref ? "fallback-edited-photo" : "fallback-layout"
+    visualMode: "local-layout-fallback"
   };
 }
 
@@ -594,7 +759,7 @@ function normalizeBrief(value: unknown): MarketingBrief {
       hsCode: ""
     },
     quote: null,
-    rfq: { subject: "Buyer RFQ", destination: "Destination", rawMessage: "" }
+    rfq: { subject: "Buyer RFQ", destination: "Destination", rawMessage: "", source: "demo" }
   });
 
   return {

@@ -8,11 +8,11 @@ import {
   withLearnedMemories
 } from "../src/memory-store.js";
 
-const customer = customers.find((candidate) => candidate.id === "mori-lighting")!;
+const customer = customers.find((candidate) => candidate.id === "nordlicht-retail")!;
 const outcome = {
   id: "mem-approved-test",
   type: "approval_outcome",
-  title: "Accepted AUR-CTRL-24 via DHL Express",
+  title: "Accepted MNG-CASH-SCF via DHL Economy Select",
   evidence: "Human approved the commercial offer.",
   confidence: 0.9,
   updatedAt: "2026-07-10"

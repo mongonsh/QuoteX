@@ -1,0 +1,15 @@
+graph LR
+    USER[Voice text photo] --> API[Validated Node API]
+    API --> QWEN[Qwen3.7 planner]
+    QWEN -->|Strict function calls| TOOLS[Six commerce skills]
+    TOOLS --> MEMORY[Customer memory]
+    TOOLS --> CATALOG[Catalog and inventory]
+    TOOLS --> ROUTE[Freight optimizer]
+    TOOLS --> QUOTE[Margin-safe quote]
+    TOOLS --> POLICY[Risk policy]
+    POLICY --> GATE{Human approval}
+    GATE -->|Approve| OUTPUT[Offer and learned outcome]
+    GATE -->|Hold| STOP[No outbound action]
+    QWEN --> LEDGER[SQLite evidence ledger]
+    OUTPUT --> MEDIA[Qwen media and HappyHorse]
+    OUTPUT --> MARKET[Marketplace drafts]

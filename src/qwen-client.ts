@@ -1,4 +1,6 @@
 import type {
+  AgentDecisionSnapshot,
+  AgentRunEvidence,
   Customer,
   Product,
   QwenMode,
@@ -46,12 +48,16 @@ interface QwenParseContext {
 
 interface QwenParseResult {
   parsed: QwenParsedRfq | null;
+  decision: AgentDecisionSnapshot | null;
+  agentRun: AgentRunEvidence | null;
   trace: QwenTrace;
 }
 
 interface ParseProxyResponse {
   ok?: boolean;
   parsed?: QwenParsedRfq;
+  decision?: AgentDecisionSnapshot;
+  agentRun?: AgentRunEvidence;
   trace?: QwenTrace;
   error?: string;
 }
@@ -62,9 +68,11 @@ export async function parseRfqWithQwen(
 ): Promise<QwenParseResult> {
   const mode = getQwenMode();
 
-  if (mode === DEMO_MODE || !globalThis.fetch || !globalThis.window) {
+  if (!globalThis.fetch || !globalThis.window) {
     return {
       parsed: null,
+      decision: null,
+      agentRun: null,
       trace: {
         status: "skipped",
         mode,
@@ -74,7 +82,7 @@ export async function parseRfqWithQwen(
   }
 
   try {
-    const response = await fetch("/api/parse-rfq", {
+    const response = await fetch("/api/run-agent", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -82,7 +90,8 @@ export async function parseRfqWithQwen(
       body: JSON.stringify({
         rfq,
         customer: context.customer,
-        products: context.products
+        products: context.products,
+        forceDeterministic: mode === DEMO_MODE
       })
     });
     const payload = (await response.json()) as ParseProxyResponse;
@@ -90,10 +99,12 @@ export async function parseRfqWithQwen(
     if (!response.ok || !payload.ok) {
       return {
         parsed: null,
+        decision: null,
+        agentRun: null,
         trace: {
           status: "error",
           mode,
-          model: payload.trace?.model || "qwen3.6-flash",
+          model: payload.trace?.model || "qwen3.7-plus",
           endpointHost: payload.trace?.endpointHost || "unknown",
           error: payload.error || `Qwen proxy returned ${response.status}`
         }
@@ -102,6 +113,8 @@ export async function parseRfqWithQwen(
 
     return {
       parsed: payload.parsed ?? null,
+      decision: payload.decision ?? null,
+      agentRun: payload.agentRun ?? null,
       trace: payload.trace ?? {
         status: "error",
         mode,
@@ -111,6 +124,8 @@ export async function parseRfqWithQwen(
   } catch (error) {
     return {
       parsed: null,
+      decision: null,
+      agentRun: null,
       trace: {
         status: "error",
         mode,
