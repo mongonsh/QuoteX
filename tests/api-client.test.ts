@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   accessTokenFromUrl,
   apiBaseUrlForHostname,
+  isRemoteApiFrontend,
   resolveQuoteXApiUrl
 } from "../src/api-client.js";
 
@@ -12,6 +13,8 @@ const cloudApiBase =
 assert.equal(apiBaseUrlForHostname("mongonsh.github.io"), cloudApiBase);
 assert.equal(apiBaseUrlForHostname("MONGONSH.GITHUB.IO"), cloudApiBase);
 assert.equal(apiBaseUrlForHostname("127.0.0.1"), "");
+assert.equal(isRemoteApiFrontend("mongonsh.github.io"), true);
+assert.equal(isRemoteApiFrontend("127.0.0.1"), false);
 assert.equal(
   resolveQuoteXApiUrl("/api/health", "mongonsh.github.io"),
   `${cloudApiBase}/api/health`

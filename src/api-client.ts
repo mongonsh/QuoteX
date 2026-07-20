@@ -31,6 +31,14 @@ export function accessTokenFromUrl(href: string): string {
   }
 }
 
+export function isRemoteApiFrontend(hostname = browserHostname()): boolean {
+  return Boolean(apiBaseUrlForHostname(hostname));
+}
+
+export function hasApiAccessToken(): boolean {
+  return Boolean(readBrowserAccessToken());
+}
+
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const isApiRequest = path.startsWith("/api/");
   const headers = new Headers(init.headers);

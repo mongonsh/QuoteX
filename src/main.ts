@@ -15,7 +15,11 @@ import {
   type MarketplaceDraft
 } from "./marketplace-adapters.js";
 import { getQwenMode, setQwenMode } from "./qwen-client.js";
-import { apiFetch } from "./api-client.js";
+import {
+  apiFetch,
+  hasApiAccessToken,
+  isRemoteApiFrontend
+} from "./api-client.js";
 import { approveQuote, formatUsd, runAutopilot } from "./rfq-engine.js";
 import type {
   Analysis,
@@ -918,6 +922,14 @@ async function bootstrapServiceHealth(): Promise<void> {
 }
 
 async function bootstrapListings(): Promise<void> {
+  if (isRemoteApiFrontend() && !hasApiAccessToken()) {
+    state.listings.items = [];
+    state.listings.status = "ready";
+    state.listings.error = "";
+    render();
+    return;
+  }
+
   try {
     const response = await apiFetch("/api/listings", {
       headers: { Accept: "application/json" }
