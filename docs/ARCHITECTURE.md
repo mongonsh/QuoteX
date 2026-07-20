@@ -97,7 +97,7 @@ Policy checks product ambiguity, stock, margin, provenance or verification needs
 | Generated image and audio | Immediate server-side persistence | Avoids losing expiring provider URLs |
 | Video jobs | Provider task ID and status | Real async polling; no simulated completion |
 
-Both persistence implementations share typed asynchronous repository contracts. Function Compute uses Tablestore and OSS, so state survives cold starts and concurrent instances. SQLite remains the zero-setup development adapter and is never presented as durable cloud storage.
+All three persistence implementations share typed asynchronous repository contracts. The production Function Compute path uses Tablestore and OSS, so state survives cold starts and concurrent instances. SQLite remains the zero-setup local adapter. The ACR-free judge deployment can use a bounded in-memory adapter, which is intentionally labeled non-durable and never presented as production storage.
 
 ## Multimodal services
 
@@ -157,7 +157,7 @@ The latest live result is 42/42 for QuoteX and 28/42 for the direct baseline. Th
 
 `server/alibaba-cloud-infrastructure.ts` idempotently creates or reuses Tablestore, private OSS, SLS, and a RAM execution role. The custom policy scopes the function to two tables, one OSS prefix, and one Logstore. `server/alibaba-storage.ts` implements the runtime repositories with compensating OSS cleanup when metadata writes fail.
 
-`server/alibaba-fc-deployment.ts` uses Alibaba Cloud's official FC3 SDK and default credential chain to create or update a Custom Container, wait for readiness, and create or update its HTTP trigger. The request is validated and secret-redacted during `npm run deploy:plan`; only `npm run deploy:fc` changes FC resources.
+`server/alibaba-fc-deployment.ts` uses Alibaba Cloud's official FC3 SDK and default credential chain to create or update either an immutable Custom Container or an ACR-free custom-runtime ZIP, wait for readiness, and create or update its HTTP trigger. The ZIP path runs on Function Compute's built-in Node.js 20 executable and rejects unsupported SQLite configuration before upload. The request is validated and secret-redacted during `npm run deploy:plan`; only `npm run deploy:fc` changes FC resources.
 
 At runtime, `tools/serve.ts` consumes non-secret Function Compute context headers such as `x-fc-request-id`, `x-fc-function-name`, and `x-fc-region`. It emits structured request logs to stdout, which Function Compute can collect in Simple Log Service. Temporary credential headers are never logged.
 

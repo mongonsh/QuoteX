@@ -1,10 +1,13 @@
+import { createHash } from "node:crypto";
 import FC20230330, {
   CreateFunctionInput,
   CreateFunctionRequest,
   CreateTriggerInput,
   CreateTriggerRequest,
   CustomContainerConfig,
+  CustomRuntimeConfig,
   GetFunctionRequest,
+  InputCodeLocation,
   ListTriggersRequest,
   LogConfig,
   UpdateFunctionInput,
@@ -18,6 +21,7 @@ import type { AppConfig, StorageConfig } from "../src/types.js";
 
 export interface AlibabaFcDeploymentPlan {
   api: "FC/2023-03-30 CreateFunction";
+  deploymentMode: "custom-container" | "code-package";
   endpoint: string;
   region: string;
   request: CreateFunctionRequest;
@@ -28,6 +32,10 @@ export interface AlibabaFcDeploymentPlan {
     blockers: string[];
     warnings: string[];
   };
+}
+
+export interface AlibabaFcCodePackage {
+  base64: string;
 }
 
 export interface AlibabaFcDeploymentResult {
@@ -57,15 +65,19 @@ const SECRET_ENVIRONMENT_NAMES = [
 
 export function buildAlibabaFcDeploymentPlan({
   appConfig,
-  env = process.env
+  env = process.env,
+  codePackage
 }: {
   appConfig: AppConfig;
   env?: NodeJS.ProcessEnv;
+  codePackage?: AlibabaFcCodePackage;
 }): AlibabaFcDeploymentPlan {
   const region = text(env.ALIBABA_FC_REGION) || "ap-northeast-1";
   const endpoint = text(env.ALIBABA_FC_ENDPOINT) || `fcv3.${region}.aliyuncs.com`;
   const functionName = text(env.ALIBABA_FC_FUNCTION_NAME) || "quotex-autopilot";
   const image = text(env.ALIBABA_FC_IMAGE);
+  const codeBytes = decodeCodePackage(codePackage);
+  const deploymentMode = codeBytes ? "code-package" : "custom-container";
   const logProject = text(env.ALIBABA_SLS_PROJECT);
   const logstore = text(env.ALIBABA_SLS_LOGSTORE);
   const accessToken = text(env.QUOTEX_ACCESS_TOKEN);
@@ -81,11 +93,22 @@ export function buildAlibabaFcDeploymentPlan({
     ...qwenEnvironment,
     ...storageEnvironment
   };
-  const customContainerConfig = new CustomContainerConfig({
-    image: image || "<immutable-acr-image>",
-    port: 9000,
-    accelerationType: "Default"
-  });
+  const customContainerConfig =
+    deploymentMode === "custom-container"
+      ? new CustomContainerConfig({
+          image: image || "<immutable-acr-image>",
+          port: 9000,
+          accelerationType: "Default"
+        })
+      : undefined;
+  const customRuntimeConfig =
+    deploymentMode === "code-package"
+      ? new CustomRuntimeConfig({
+          command: ["/var/fc/lang/nodejs20/bin/node"],
+          args: ["/code/dist/tools/serve.js"],
+          port: 9000
+        })
+      : undefined;
   const logConfig =
     logProject && logstore
       ? new LogConfig({
@@ -98,10 +121,13 @@ export function buildAlibabaFcDeploymentPlan({
         })
       : undefined;
   const body = new CreateFunctionInput({
+    ...(codePackage?.base64
+      ? { code: new InputCodeLocation({ zipFile: codePackage.base64 }) }
+      : {}),
     functionName,
     description:
       "QuoteX governed Qwen commerce agent. Qwen plans; verified tools own facts; a human approves.",
-    runtime: "custom-container",
+    runtime: deploymentMode === "code-package" ? "custom.debian10" : "custom-container",
     handler: "not-used",
     cpu: boundedNumber(env.ALIBABA_FC_CPU, 0.5, 0.25, 16),
     memorySize: boundedInteger(env.ALIBABA_FC_MEMORY_MB, 1024, 512, 32768, 64),
@@ -109,7 +135,8 @@ export function buildAlibabaFcDeploymentPlan({
     timeout: boundedInteger(env.ALIBABA_FC_TIMEOUT_SECONDS, 300, 60, 3600, 1),
     instanceConcurrency: boundedInteger(env.ALIBABA_FC_CONCURRENCY, 1, 1, 100, 1),
     internetAccess: true,
-    customContainerConfig,
+    ...(customContainerConfig ? { customContainerConfig } : {}),
+    ...(customRuntimeConfig ? { customRuntimeConfig } : {}),
     environmentVariables,
     ...(text(env.ALIBABA_FC_ROLE_ARN) ? { role: text(env.ALIBABA_FC_ROLE_ARN) } : {}),
     ...(logConfig ? { logConfig } : {})
@@ -128,8 +155,20 @@ export function buildAlibabaFcDeploymentPlan({
     })
   });
   const usesAlibabaStorage = appConfig.storage.provider === "alibaba";
+  const usesMemoryStorage = appConfig.storage.provider === "memory";
   const blockers = [
-    ...(!image ? ["ALIBABA_FC_IMAGE must point to an immutable Alibaba Container Registry image."] : []),
+    ...(deploymentMode === "custom-container" && !image
+      ? ["ALIBABA_FC_IMAGE must point to an immutable Alibaba Container Registry image."]
+      : []),
+    ...(codePackage && !codeBytes ? ["The Function Compute ZIP package is empty or invalid."] : []),
+    ...(codeBytes && codeBytes.length > 100_000_000
+      ? ["The Function Compute ZIP package exceeds the 100 MB upload limit."]
+      : []),
+    ...(deploymentMode === "code-package" && appConfig.storage.provider === "sqlite"
+      ? [
+          "Code-package deployment requires QUOTEX_STORAGE_PROVIDER=memory or alibaba because the Function Compute Node.js 20 runtime does not provide node:sqlite."
+        ]
+      : []),
     ...(!appConfig.qwen.agentApiKey ? ["A Qwen agent API key is required."] : []),
     ...(!accessToken
       ? ["QUOTEX_ACCESS_TOKEN is required before exposing paid AI endpoints publicly."]
@@ -154,16 +193,26 @@ export function buildAlibabaFcDeploymentPlan({
     ...(!logConfig
       ? ["Set ALIBABA_SLS_PROJECT and ALIBABA_SLS_LOGSTORE to persist structured invocation logs."]
       : []),
-    ...(!usesAlibabaStorage && environmentVariables.QUOTEX_DB_PATH.startsWith("/tmp/")
+    ...(appConfig.storage.provider === "sqlite" &&
+    environmentVariables.QUOTEX_DB_PATH.startsWith("/tmp/")
       ? ["The SQLite path is ephemeral. Mount NAS and set ALIBABA_FC_DB_PATH for durable production data."]
       : []),
     ...(!usesAlibabaStorage
       ? ["Use QUOTEX_STORAGE_PROVIDER=alibaba with Tablestore and OSS for durable cloud data."]
+      : []),
+    ...(deploymentMode === "code-package"
+      ? [
+          "The ZIP deployment uses Function Compute's built-in Node.js 20 runtime.",
+          ...(usesMemoryStorage
+            ? ["Memory storage is intentionally ephemeral and intended only for the public hackathon demo."]
+            : [])
+        ]
       : [])
   ];
 
   return {
     api: "FC/2023-03-30 CreateFunction",
+    deploymentMode,
     endpoint,
     region,
     request: new CreateFunctionRequest({ body }),
@@ -195,7 +244,9 @@ export async function createAlibabaFcFunction(
     credential,
     endpoint: plan.endpoint,
     regionId: plan.region,
-    protocol: "https"
+    protocol: "https",
+    connectTimeout: 30_000,
+    readTimeout: 180_000
   });
   const client = new FC20230330.default(openApiConfig);
   const functionName = plan.request.body?.functionName || "";
@@ -268,8 +319,10 @@ export function createUpdateFunctionRequest(
   const body = createRequest.body;
   return new UpdateFunctionRequest({
     body: new UpdateFunctionInput({
+      code: body?.code,
       cpu: body?.cpu,
       customContainerConfig: body?.customContainerConfig,
+      customRuntimeConfig: body?.customRuntimeConfig,
       description: body?.description,
       diskSize: body?.diskSize,
       environmentVariables: body?.environmentVariables,
@@ -299,6 +352,9 @@ export function createUpdateTriggerRequest(
 
 export function serializeAlibabaFcPlan(plan: AlibabaFcDeploymentPlan): Record<string, unknown> {
   const body = plan.request.body;
+  const codeBytes = decodeCodePackage(
+    body?.code?.zipFile ? { base64: body.code.zipFile } : undefined
+  );
   const environmentVariables = Object.fromEntries(
     Object.entries(body?.environmentVariables || {}).map(([name, value]) => [
       name,
@@ -312,6 +368,7 @@ export function serializeAlibabaFcPlan(plan: AlibabaFcDeploymentPlan): Record<st
 
   return {
     api: plan.api,
+    deploymentMode: plan.deploymentMode,
     endpoint: plan.endpoint,
     region: plan.region,
     request: {
@@ -328,11 +385,27 @@ export function serializeAlibabaFcPlan(plan: AlibabaFcDeploymentPlan): Record<st
         timeout: body?.timeout,
         instanceConcurrency: body?.instanceConcurrency,
         internetAccess: body?.internetAccess,
-        customContainerConfig: {
-          image: body?.customContainerConfig?.image,
-          port: body?.customContainerConfig?.port,
-          accelerationType: body?.customContainerConfig?.accelerationType
-        },
+        customContainerConfig: body?.customContainerConfig
+          ? {
+              image: body.customContainerConfig.image,
+              port: body.customContainerConfig.port,
+              accelerationType: body.customContainerConfig.accelerationType
+            }
+          : null,
+        customRuntimeConfig: body?.customRuntimeConfig
+          ? {
+              command: body.customRuntimeConfig.command,
+              args: body.customRuntimeConfig.args,
+              port: body.customRuntimeConfig.port
+            }
+          : null,
+        codePackage: codeBytes
+          ? {
+              included: true,
+              sizeBytes: codeBytes.length,
+              sha256: createHash("sha256").update(codeBytes).digest("hex")
+            }
+          : null,
         environmentVariables,
         role: body?.role || null,
         logConfig: body?.logConfig
@@ -411,6 +484,17 @@ function buildStorageEnvironment(config: AppConfig): Record<string, string> {
 
 function compact(values: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value.trim().length > 0));
+}
+
+function decodeCodePackage(codePackage: AlibabaFcCodePackage | undefined): Buffer | null {
+  if (!codePackage?.base64) return null;
+
+  try {
+    const bytes = Buffer.from(codePackage.base64, "base64");
+    return bytes.length ? bytes : null;
+  } catch {
+    return null;
+  }
 }
 
 function isValidFunctionName(value: string): boolean {

@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import {
   buildAlibabaFcDeploymentPlan,
   createAlibabaFcFunction,
@@ -14,7 +16,15 @@ try {
   if (!appConfig.qwen.ttsVoice && designedVoice.voice) {
     appConfig.qwen.ttsVoice = designedVoice.voice;
   }
-  const plan = buildAlibabaFcDeploymentPlan({ appConfig, env });
+  const codePackagePath =
+    env.ALIBABA_FC_CODE_ZIP ||
+    (env.ALIBABA_FC_DEPLOYMENT_MODE === "code"
+      ? ".runtime/alibaba-fc/quotex-fc.zip"
+      : "");
+  const codePackage = codePackagePath
+    ? { base64: (await readFile(resolve(codePackagePath))).toString("base64") }
+    : undefined;
+  const plan = buildAlibabaFcDeploymentPlan({ appConfig, env, codePackage });
 
   if (!apply) {
     console.log(JSON.stringify(serializeAlibabaFcPlan(plan), null, 2));

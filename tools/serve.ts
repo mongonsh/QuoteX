@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
-import { join, normalize, resolve, sep } from "node:path";
+import { dirname, join, normalize, resolve, sep } from "node:path";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { customers, products } from "../src/data.js";
 import { loadConfig, loadEnvironment } from "../server/config.js";
 import { generateMarketingAsset } from "../server/marketing-asset.js";
@@ -21,7 +22,7 @@ import {
   submitProductVideo
 } from "../server/happyhorse-video.js";
 
-const root = resolve(process.cwd());
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || "0.0.0.0";
 const [config, environment] = await Promise.all([loadConfig(), loadEnvironment()]);

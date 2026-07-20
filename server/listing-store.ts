@@ -1,7 +1,8 @@
 import { mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync as DatabaseSyncType } from "node:sqlite";
 import type {
   CreateSellerListingInput,
   ProductListingCategory,
@@ -39,6 +40,7 @@ const TARGET_MARKETS: SellerListing["targetMarket"][] = [
 ];
 const IMAGE_DATA_URL = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/i;
 const MAX_IMAGE_BYTES = 5_000_000;
+const require = createRequire(import.meta.url);
 
 interface ListingRow {
   id: string;
@@ -78,10 +80,11 @@ export class ListingValidationError extends Error {
 }
 
 export class SellerListingStore {
-  readonly database: DatabaseSync;
+  readonly database: DatabaseSyncType;
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+    const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
     this.database = new DatabaseSync(path);
     this.database.exec(`
       PRAGMA journal_mode = WAL;

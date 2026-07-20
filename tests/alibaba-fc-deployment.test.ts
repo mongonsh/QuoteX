@@ -61,4 +61,53 @@ const blocked = buildAlibabaFcDeploymentPlan({
 assert.equal(blocked.readiness.readyToApply, false);
 assert.ok(blocked.readiness.blockers.length >= 2);
 
+const codePackageBytes = Buffer.from("QuoteX FC ZIP fixture");
+const codePackageConfig = createTestConfig();
+codePackageConfig.storage.provider = "memory";
+const codePackagePlan = buildAlibabaFcDeploymentPlan({
+  appConfig: codePackageConfig,
+  env: {
+    ALIBABA_FC_REGION: "ap-northeast-1",
+    ALIBABA_FC_FUNCTION_NAME: "quotex-code-package",
+    QUOTEX_ACCESS_TOKEN: TEST_CREDENTIALS.accessToken
+  },
+  codePackage: { base64: codePackageBytes.toString("base64") }
+});
+assert.equal(codePackagePlan.deploymentMode, "code-package");
+assert.equal(codePackagePlan.request.body?.runtime, "custom.debian10");
+assert.equal(codePackagePlan.request.body?.customContainerConfig, undefined);
+assert.equal(codePackagePlan.request.body?.customRuntimeConfig?.port, 9000);
+assert.equal(
+  codePackagePlan.request.body?.customRuntimeConfig?.command?.[0],
+  "/var/fc/lang/nodejs20/bin/node"
+);
+assert.equal(codePackagePlan.readiness.readyToApply, true);
+assert.match(codePackagePlan.readiness.warnings.join(" "), /intentionally ephemeral/);
+
+const unsupportedSqlitePlan = buildAlibabaFcDeploymentPlan({
+  appConfig: createTestConfig(),
+  env: {
+    ALIBABA_FC_FUNCTION_NAME: "quotex-code-package",
+    QUOTEX_ACCESS_TOKEN: TEST_CREDENTIALS.accessToken
+  },
+  codePackage: { base64: codePackageBytes.toString("base64") }
+});
+assert.equal(unsupportedSqlitePlan.readiness.readyToApply, false);
+assert.match(unsupportedSqlitePlan.readiness.blockers.join(" "), /node:sqlite/);
+
+const serializedCodePlan = JSON.stringify(serializeAlibabaFcPlan(codePackagePlan));
+assert.equal(
+  serializedCodePlan.includes(codePackagePlan.request.body?.code?.zipFile || ""),
+  false
+);
+assert.match(serializedCodePlan, /code-package/);
+assert.match(serializedCodePlan, /sha256/);
+
+const updateCodeFunction = createUpdateFunctionRequest(codePackagePlan.request);
+assert.equal(
+  updateCodeFunction.body?.code?.zipFile,
+  codePackagePlan.request.body?.code?.zipFile
+);
+assert.equal(updateCodeFunction.body?.customRuntimeConfig?.port, 9000);
+
 console.log("alibaba-fc-deployment tests passed");

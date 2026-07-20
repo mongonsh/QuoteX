@@ -84,7 +84,12 @@ export async function loadConfig(): Promise<AppConfig> {
       timeoutMs: Number(env.QWEN_TIMEOUT_MS || 45000)
     },
     storage: {
-      provider: env.QUOTEX_STORAGE_PROVIDER === "alibaba" ? "alibaba" : "sqlite",
+      provider:
+        env.QUOTEX_STORAGE_PROVIDER === "alibaba"
+          ? "alibaba"
+          : env.QUOTEX_STORAGE_PROVIDER === "memory"
+            ? "memory"
+            : "sqlite",
       accessKeyId:
         env.TABLESTORE_ACCESS_KEY_ID ||
         env.OSS_ACCESS_KEY_ID ||

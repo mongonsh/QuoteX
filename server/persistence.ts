@@ -1,7 +1,6 @@
 import { join } from "node:path";
-import { AgentRunStore, type StoredAgentRun } from "./agent-run-store.js";
-import { createAlibabaPersistence } from "./alibaba-storage.js";
-import { SellerListingStore } from "./listing-store.js";
+import type { StoredAgentRun } from "./agent-run-store.js";
+import { createMemoryPersistence } from "./memory-persistence.js";
 import type {
   AgentRunEvidence,
   AppConfig,
@@ -31,9 +30,9 @@ export interface AgentRunRepository {
 }
 
 export interface Persistence {
-  provider: "sqlite" | "alibaba";
-  database: "SQLite" | "Alibaba Tablestore";
-  objectStorage: "SQLite BLOB" | "Alibaba OSS";
+  provider: "sqlite" | "memory" | "alibaba";
+  database: "SQLite" | "Memory" | "Alibaba Tablestore";
+  objectStorage: "SQLite BLOB" | "Memory" | "Alibaba OSS";
   durable: boolean;
   listingStore: SellerListingRepository;
   agentRunStore: AgentRunRepository;
@@ -50,9 +49,17 @@ export async function createPersistence({
   databasePath?: string;
 }): Promise<Persistence> {
   if (config.storage.provider === "alibaba") {
+    const { createAlibabaPersistence } = await import("./alibaba-storage.js");
     return createAlibabaPersistence(config.storage);
   }
+  if (config.storage.provider === "memory") {
+    return createMemoryPersistence();
+  }
 
+  const [{ AgentRunStore }, { SellerListingStore }] = await Promise.all([
+    import("./agent-run-store.js"),
+    import("./listing-store.js")
+  ]);
   const listingStore = new SellerListingStore(databasePath);
   const agentRunStore = new AgentRunStore(databasePath);
 

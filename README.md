@@ -161,20 +161,25 @@ The fallback is a reliability feature, not a simulated Qwen success. QuoteX neve
 
 ## Alibaba Cloud deployment
 
-QuoteX includes a production container that listens on Function Compute's expected `0.0.0.0:9000` default. Build and push an immutable AMD64 image to Alibaba Cloud Container Registry, then validate the exact FC3 request:
+QuoteX has two executable Function Compute deployment paths:
+
+- `code-package`: an ACR-free 2.85 MB ZIP that runs on Function Compute's built-in Node.js 20 executable. It is the fastest judge-demo route and uses explicitly non-durable memory storage unless Alibaba Tablestore and OSS are configured.
+- `custom-container`: an immutable AMD64 ACR image with Tablestore, private OSS, SLS, and a least-privilege RAM role for the durable production architecture.
+
+Build and inspect the ACR-free request:
 
 ```bash
 npm run deploy:prepare
-npm run provision:plan
-npm run image:plan
+npm run deploy:package
 npm run deploy:plan
+npm run deploy:fc
 ```
 
-The apply sequence is `npm run provision:alibaba`, `npm run image:publish`, and `npm run deploy:fc`. It provisions Tablestore, private OSS, SLS, and the RAM execution role; captures an immutable ACR digest; then creates or updates Function Compute and its HTTP trigger. Dry runs redact every Qwen key and the private demo token. Function Compute context headers become structured SLS logs without logging temporary credentials.
+Set `ALIBABA_FC_DEPLOYMENT_MODE=code` and `QUOTEX_STORAGE_PROVIDER=memory` for that demo route. The full apply sequence remains `npm run provision:alibaba`, `npm run image:publish`, and `npm run deploy:fc`; it provisions managed storage and logging, captures an immutable ACR digest, then creates or updates Function Compute and its HTTP trigger. Both dry runs redact every Qwen key and the private demo token.
 
 Devpost specifies a repository code-file link as the required Alibaba Cloud deployment proof. Use [server/alibaba-fc-deployment.ts](server/alibaba-fc-deployment.ts): it constructs and executes the official FC3 `CreateFunction`/`UpdateFunction` and HTTP-trigger requests. [server/alibaba-cloud-infrastructure.ts](server/alibaba-cloud-infrastructure.ts) provisions Tablestore, OSS, SLS, and RAM, while [server/qwen-tool-orchestrator.ts](server/qwen-tool-orchestrator.ts) shows the live Qwen Cloud runtime boundary.
 
-The code-proof requirement is distinct from additional runtime evidence. A Function Compute URL, image digest, health response, or console recording is reported only after the apply command succeeds. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the evidence contract and reproducible deployment path.
+The code-proof requirement is distinct from additional runtime evidence. A Function Compute URL, artifact digest, health response, or console recording is reported only after the apply command succeeds. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the evidence contract and both reproducible deployment paths.
 
 ## Repository map
 

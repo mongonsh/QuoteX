@@ -26,4 +26,16 @@ assert.deepEqual(summary, {
 });
 assert.equal(JSON.stringify(summary).includes("must-not-be-exposed"), false);
 
+const activationSummary = summarizeAlibabaError({
+  code: "AccessDenied",
+  message: "FC service is not enabled for current user.",
+  statusCode: 403,
+  requestId: "request-activation"
+});
+
+assert.equal(
+  activationSummary.nextStep,
+  "Activate Function Compute at https://fc.console.alibabacloud.com/ with the Alibaba Cloud account owner, then retry."
+);
+
 console.log("alibaba-error tests passed");

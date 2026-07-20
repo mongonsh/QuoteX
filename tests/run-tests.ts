@@ -14,6 +14,7 @@ await import("./qwen-asr.test.js");
 await import("./speech-transcript.test.js");
 await import("./listing-store.test.js");
 await import("./agent-run-store.test.js");
+await import("./memory-persistence.test.js");
 await import("./alibaba-storage.test.js");
 await import("./seller-intake-agent.test.js");
 await import("./customer-agent.test.js");

@@ -18,6 +18,8 @@ export function summarizeAlibabaError(error: unknown): AlibabaErrorSummary {
   const rawMessage =
     firstText(data.Message, source.message) || "Alibaba Cloud rejected the request.";
   const message = rawMessage.replace(/[,\s]*extra details:.*$/i, "").slice(0, 400);
+  const serviceActivationRequired =
+    code === "AccessDenied" && /service is not enabled/i.test(message);
 
   return {
     code,
@@ -27,9 +29,11 @@ export function summarizeAlibabaError(error: unknown): AlibabaErrorSummary {
     ...(missingAction ? { missingAction } : {}),
     ...(code === "AccessDenied"
       ? {
-          nextStep: missingAction
-            ? `Grant the temporary deployment RAM user permission for ${missingAction}, then retry.`
-            : "Grant the temporary deployment RAM user the required service permission, then retry."
+          nextStep: serviceActivationRequired
+            ? "Activate Function Compute at https://fc.console.alibabacloud.com/ with the Alibaba Cloud account owner, then retry."
+            : missingAction
+              ? `Grant the temporary deployment RAM user permission for ${missingAction}, then retry.`
+              : "Grant the temporary deployment RAM user the required service permission, then retry."
         }
       : {})
   };

@@ -471,7 +471,7 @@ export interface QwenConfig {
 }
 
 export interface StorageConfig {
-  provider: "sqlite" | "alibaba";
+  provider: "sqlite" | "memory" | "alibaba";
   accessKeyId: string;
   accessKeySecret: string;
   securityToken: string;

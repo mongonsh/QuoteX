@@ -2,12 +2,12 @@
 
 QuoteX implements an executable Alibaba Cloud backend deployment:
 
-- **Function Compute** runs the AMD64 custom container and public HTTPS trigger when applied.
+- **Function Compute** runs either an ACR-free code package or the AMD64 custom container and exposes the public HTTPS trigger.
 - **Tablestore** keeps validated seller listings and inspectable agent-run evidence.
 - **OSS** keeps original product photos in a private, encrypted bucket.
 - **SLS** receives structured request, instance, and LLM metrics.
 - **RAM** gives the function short-lived, least-privilege storage credentials.
-- **ACR** holds the immutable judged container image.
+- **ACR** holds the immutable production container image.
 
 The implementation is in [server/alibaba-cloud-infrastructure.ts](../server/alibaba-cloud-infrastructure.ts), [server/alibaba-storage.ts](../server/alibaba-storage.ts), and [server/alibaba-fc-deployment.ts](../server/alibaba-fc-deployment.ts). Provisioning and deployment are dry-run by default and apply only through explicit commands.
 
@@ -19,7 +19,7 @@ The published hackathon requirements specify a direct repository code-file link 
 https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts
 ```
 
-That file uses the official `@alicloud/fc20230330` SDK to create or update the Custom Container function, wait for readiness, and create or update its HTTP trigger. The infrastructure and storage modules provide additional inspectable proof of Tablestore, OSS, SLS, RAM, and Alibaba temporary-credential use.
+That file uses the official `@alicloud/fc20230330` SDK to create or update either a custom-runtime code package or Custom Container function, wait for readiness, and create or update its HTTP trigger. The infrastructure and storage modules provide additional inspectable proof of Tablestore, OSS, SLS, RAM, and Alibaba temporary-credential use.
 
 A dry run proves request construction without changing cloud state. It is not presented as a live Function Compute deployment. Runtime URL, image digest, health response, and console evidence are added only after the explicit apply sequence succeeds.
 
@@ -28,7 +28,7 @@ A dry run proves request construction without changing cloud state. It is not pr
 Use Alibaba Cloud **product trials**, not a solution trial:
 
 1. Complete account identity verification and attach a supported payment method.
-2. Open **Expenses and Costs > Benefits > My Trial** and claim the Function Compute trial if the account is eligible.
+2. Open the [Function Compute console](https://fc.console.alibabacloud.com/), activate the service, and accept its terms. This account-owner action cannot be performed by the deployment SDK.
 3. Claim the OSS Standard LRS product trial before activating OSS if the account is eligible.
 4. Use ACR Personal Edition in Japan (Tokyo), which is free during its public preview.
 5. Activate Tablestore only after accepting that it is pay-as-you-go. QuoteX uses a Capacity instance, no search index, zero reserved throughput, bounded scans, at most 1,000 listings, and at most 200 retained agent runs.
@@ -36,6 +36,27 @@ Use Alibaba Cloud **product trials**, not a solution trial:
 The [Alibaba Cloud free-trial rules](https://www.alibabacloud.com/help/en/user-center/product-overview/learn-about-free-trials) require first use of each eligible product. A solution trial is an isolated POC account with a maximum total duration of 168 hours; its resources and data are deleted when the trial ends and cannot be retained. It is therefore unsuitable for the durable public judge URL.
 
 Function Compute's first-use quota and the OSS storage trial reduce the main runtime and storage costs. Tablestore does not advertise a matching core database trial: instance creation is free, while stored bytes and actual read/write CUs are pay-as-you-go. At hackathon scale those units are tiny, but they are not represented as free. OSS request and outbound traffic charges are also outside the storage-capacity trial.
+
+## ACR-free judge deployment
+
+The lightweight deployment avoids Container Registry entirely:
+
+```bash
+npm run deploy:prepare
+npm run deploy:package
+```
+
+Set these private `.env` values:
+
+```dotenv
+ALIBABA_FC_DEPLOYMENT_MODE=code
+ALIBABA_FC_CODE_ZIP=.runtime/alibaba-fc/quotex-fc.zip
+QUOTEX_STORAGE_PROVIDER=memory
+```
+
+`deploy:package` builds a transport-safe ZIP containing only the compiled server, browser bundle, and assets. Function Compute starts it with `/var/fc/lang/nodejs20/bin/node` under `custom.debian10`. The deployment planner rejects `sqlite` in this mode because the managed Node.js 20 runtime does not provide `node:sqlite`.
+
+Memory mode is useful for a public hackathon walkthrough but is deliberately reported as `durable: false`: listings and run history can disappear after a cold start or instance replacement. Set `QUOTEX_STORAGE_PROVIDER=alibaba` and configure Tablestore, OSS, and the execution role for durable storage.
 
 ## Container contract
 
@@ -140,17 +161,16 @@ npm run deploy:plan
 npm run deploy:fc
 ```
 
-The deploy command uses the official FC3 TypeScript SDK. It creates or updates the function, waits until the image is active, and creates or updates the anonymous HTTP trigger. Qwen keys and the access token are redacted from plans and never printed from API responses.
+The deploy command uses the official FC3 TypeScript SDK. It creates or updates the function, waits until the function is active, and creates or updates the anonymous HTTP trigger. Qwen keys and the access token are redacted from plans and never printed from API responses.
 
-The function defaults are:
+Shared function defaults are:
 
-- Custom Container runtime on port `9000`;
+- custom HTTP runtime on port `9000`;
 - 0.5 vCPU, 1 GB memory, 300-second timeout, concurrency 1;
 - outbound internet enabled for Qwen APIs;
-- SLS request, instance, and LLM metrics;
-- Tablestore metadata and agent evidence;
-- private OSS product photos;
-- an attached RAM execution role with temporary credentials.
+- application-level access protection for paid AI endpoints.
+
+The full container path additionally enables SLS request, instance, and LLM metrics; Tablestore metadata and agent evidence; private OSS product photos; and an attached RAM execution role with temporary credentials.
 
 The returned `publicUrl` is the base endpoint. The private judge link is:
 
@@ -162,7 +182,7 @@ After the first successful visit, the browser uses the secure cookie and the cle
 
 ## 7. Cloud smoke test
 
-Verify `GET /api/health`, then create, retrieve, stream the photo for, and delete one realistic listing through the protected API. The health response must show:
+Verify `GET /api/health`. For the durable path, create, retrieve, stream the photo for, and delete one realistic listing through the protected API. Durable cloud health must show:
 
 ```json
 {
@@ -180,12 +200,14 @@ Verify `GET /api/health`, then create, retrieve, stream the photo for, and delet
 }
 ```
 
+The lightweight judge path instead reports `provider: "memory"` and `durable: false`; that is expected and must remain visible in the evidence.
+
 ## 8. Optional extra proof
 
 Capture one continuous, short recording showing:
 
 1. the Alibaba Cloud console with the Function Compute function name and region;
-2. the selected ACR image/version;
+2. the selected ZIP artifact digest or ACR image/version;
 3. environment variable **names only**—never reveal values;
 4. the function endpoint loading QuoteX;
 5. `/api/health` returning `ok: true` and `configured: true`;
@@ -205,7 +227,7 @@ https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts
 Additional Function Compute runtime evidence, when available:
 Live application: <real public Function Compute URL>
 Cloud console proof: <real video URL>
-Image version/digest: <immutable ACR reference>
+Artifact version/digest: <ZIP SHA-256 or immutable ACR reference>
 Health check captured: <UTC timestamp>
 ```
 

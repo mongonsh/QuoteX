@@ -53,7 +53,7 @@ Customers can also ask questions by voice. Qwen ASR transcribes the complete rec
 
 ## How we built it
 
-QuoteX is written in strict TypeScript with shared domain and API contracts. The browser provides an editable workbench; a Function Compute custom container owns credentials, input validation, Qwen calls, durable Tablestore evidence, private OSS media, and SLS-ready structured logs.
+QuoteX is written in strict TypeScript with shared domain and API contracts. The browser provides an editable workbench; an Alibaba Function Compute backend owns credentials, input validation, and Qwen calls. The lightweight judge deployment uses an ACR-free custom-runtime ZIP; the production path adds durable Tablestore evidence, private OSS media, SLS-ready structured logs, and an immutable ACR container.
 
 The main engineering challenge was separating probabilistic planning from commercial authority. `server/qwen-tool-orchestrator.ts` gives Qwen strict JSON schemas for only the skills still missing and caps the loop at four planner turns. Qwen may select tools and propose bounded arguments, but `src/rfq-engine.ts` computes every trusted result.
 
@@ -143,7 +143,7 @@ Devpost requests a direct link to a code file demonstrating Alibaba Cloud servic
 
 `https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts`
 
-It uses the official `@alicloud/fc20230330` SDK to create or update the Custom Container function and its HTTP trigger. The adjacent infrastructure module provisions Tablestore, private OSS, SLS, and a least-privilege RAM execution role. The live Qwen orchestration module calls the Qwen Cloud workspace endpoint with six typed commerce tools. Dry-run plans are not described as live Function Compute runtime evidence.
+It uses the official `@alicloud/fc20230330` SDK to create or update either a code-package or Custom Container function and its HTTP trigger. The adjacent infrastructure module provisions Tablestore, private OSS, SLS, and a least-privilege RAM execution role. The live Qwen orchestration module calls the Qwen Cloud workspace endpoint with six typed commerce tools. Dry-run plans are not described as live Function Compute runtime evidence.
 
 ## Links
 

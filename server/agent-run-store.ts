@@ -1,9 +1,11 @@
 import { mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync as DatabaseSyncType } from "node:sqlite";
 import type { AgentRunEvidence } from "../src/types.js";
 
 const MAX_RETAINED_RUNS = 200;
+const require = createRequire(import.meta.url);
 
 interface AgentRunRow {
   run_id: string;
@@ -38,10 +40,11 @@ export interface StoredAgentRun {
 }
 
 export class AgentRunStore {
-  readonly database: DatabaseSync;
+  readonly database: DatabaseSyncType;
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+    const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
     this.database = new DatabaseSync(path);
     this.database.exec(`
       PRAGMA journal_mode = WAL;

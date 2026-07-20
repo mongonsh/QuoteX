@@ -76,7 +76,6 @@ The exact protocol and limitations are in `docs/EVALUATION.md`.
 ## Owner evidence still required
 
 - Upload the finished 102-second `.runtime/demo/QuoteX-motion-demo.mp4` to a public or unlisted Devpost-supported host.
-- Commit and push the current judge-ready work. `origin/main` still points to the earlier `design update` commit and does not contain the new agent, evaluator, deployment proof, tests, diagrams, or documentation.
 - Confirm `https://github.com/mongonsh/QuoteX` is public and includes `server/alibaba-fc-deployment.ts`; use that public code URL as the required Alibaba Cloud API proof.
 - Replace the demo-video placeholder in `docs/DEVPOST_SUBMISSION.md`.
 - The published submission format requires the Alibaba code-file link. A public Function Compute URL and console recording are separate, stronger runtime evidence and must be included only if the real apply succeeds.
