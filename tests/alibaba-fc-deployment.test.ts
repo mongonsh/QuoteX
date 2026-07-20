@@ -33,10 +33,6 @@ assert.equal(
   plan.request.body?.environmentVariables?.QUOTEX_ACCESS_TOKEN,
   TEST_CREDENTIALS.accessToken
 );
-assert.equal(
-  plan.request.body?.environmentVariables?.QUOTEX_PUBLIC_APP_URL,
-  "https://mongonsh.github.io/QuoteX/"
-);
 assert.equal(plan.readiness.readyToApply, true);
 
 const serialized = JSON.stringify(serializeAlibabaFcPlan(plan));

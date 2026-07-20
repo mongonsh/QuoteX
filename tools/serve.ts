@@ -14,10 +14,6 @@ import { guideSellerIntakeWithQwen } from "../server/seller-intake-agent.js";
 import { contentTypeForPath } from "../server/static-content.js";
 import { createPersistence } from "../server/persistence.js";
 import {
-  buildPublicAppRedirect,
-  normalizePublicAppUrl
-} from "../server/public-app.js";
-import {
   buildCorsHeaders,
   isCorsOriginAllowed,
   parseCorsOrigins
@@ -38,7 +34,6 @@ const [config, environment] = await Promise.all([loadConfig(), loadEnvironment()
 const accessToken = cleanAccessToken(environment.QUOTEX_ACCESS_TOKEN);
 const accessCookie = accessToken ? accessTokenDigest(accessToken) : "";
 const allowedCorsOrigins = parseCorsOrigins(environment.QUOTEX_CORS_ORIGINS);
-const publicAppUrl = normalizePublicAppUrl(environment.QUOTEX_PUBLIC_APP_URL);
 const persistence = await createPersistence({ config, root });
 const { listingStore, agentRunStore } = persistence;
 const MAX_JSON_BODY_BYTES = 10_500_000;
@@ -105,26 +100,11 @@ const server = createServer(async (request, response) => {
         return;
       }
 
-      const publicRedirect = buildPublicAppRedirect(publicAppUrl, candidate);
       response.writeHead(303, {
         ...securityHeaders,
         "Cache-Control": "no-store",
         "Set-Cookie": buildAccessCookie(accessCookie, request),
-        Location: publicRedirect || "/"
-      });
-      response.end();
-      return;
-    }
-
-    if (
-      publicAppUrl &&
-      request.method === "GET" &&
-      (url.pathname === "/" || url.pathname === "/index.html")
-    ) {
-      response.writeHead(302, {
-        ...securityHeaders,
-        "Cache-Control": "no-store",
-        Location: publicAppUrl
+        Location: "/"
       });
       response.end();
       return;
