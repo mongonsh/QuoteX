@@ -1,28 +1,49 @@
-# Why our Qwen agent is not allowed to set a price
+---
+title: I Gave Qwen Six Tools, but Not the Right to Set a Price
+published: false
+description: How QuoteX turns messy buyer messages into auditable cross-border offers with Qwen Cloud, verified tools, memory, and one human gate.
+tags: ai, qwen, agents, alibabacloud
+cover_image: https://raw.githubusercontent.com/mongonsh/QuoteX/main/docs/screenshots/quotex-workbench.png
+---
 
-Cross-border sales looks simple from the outside: a buyer asks for a product, and a seller replies with a quote.
+A buyer sends one message:
 
-The actual workflow is a chain of small, risky decisions. What product did the buyer mean? Is it in stock? Which customer terms still apply? Can freight meet the deadline? Does the price protect margin? Which claims need a person to approve?
+> Please quote 500 Grade-A Mongolian cashmere scarves for our Berlin stores. We need three colors, plastic-free packaging, DDP delivery within 21 days, freight below USD 1,000, and our usual payment terms.
 
-A language model is excellent at understanding the messy request. It should not become the source of truth for inventory, money, or an irreversible send action.
+It looks like a writing task. It is actually a chain of commercial decisions.
 
-That principle shaped QuoteX, our Track 4 Autopilot Agent for the Global AI Hackathon Series with Qwen Cloud:
+Which product did the buyer mean? Is it in stock? What were the buyer's "usual" terms? Which route can meet the deadline? Does the final price protect margin? Can the system send the offer?
 
-> Qwen plans. Verified tools decide facts. A human approves the commercial action.
+The dangerous part is not understanding the sentence. The dangerous part is turning uncertain language into a promise involving inventory, money, and delivery.
+
+That is why I built **QuoteX**, a governed cross-border commerce agent for the Qwen Cloud Autopilot Agent track.
+
+Its core rule fits in one line:
+
+> **Qwen plans. Verified tools decide facts. A human approves the promise.**
+
+## Watch the demo
+
+{% youtube AqyQlGGp_O8 %}
+
+The demo follows a real-world export scenario from Ulaanbaatar to Berlin. One buyer message becomes a grounded `$33,630` landed offer, a customer-safe voice answer, and a campaign asset. The system still stops before sending anything.
 
 ## The request is not a form
 
-Our main demo starts with a realistic buyer message:
+Traditional sales software begins by asking a person to fill ten fields. Real buyers do not behave like database rows. They send emails, voice messages, photos, partial specifications, and phrases such as "same as last time."
 
-> Please quote 500 Grade-A Mongolian cashmere scarves for our Berlin stores in charcoal, forest green, and natural oat. Use plastic-free paper sleeves, deliver DDP Berlin within 21 days, keep freight under USD 1,000, and use our usual payment terms.
+QuoteX starts where the seller already is:
 
-That short paragraph contains product identity, quantity, destination, delivery pressure, a conditional freight preference, and two references to customer history.
+- paste a buyer message;
+- speak the request;
+- upload a product photo;
+- or describe a new item conversationally.
 
-A single extraction call can turn it into JSON. That is useful, but it is not an agent workflow. It also does not prove that the resulting SKU, stock, price, freight, or approval state came from a trusted source.
+Qwen structures the language, but the extracted fields remain editable. If an important fact is missing, the agent asks for that fact instead of quietly inventing it.
 
-## A bounded Qwen planner
+## Six tools, three kinds of authority
 
-QuoteX gives Qwen3.7 six strict function tools:
+QuoteX gives `qwen3.7-plus` six strict function tools:
 
 1. `structure_request`
 2. `retrieve_customer_memory`
@@ -31,118 +52,171 @@ QuoteX gives Qwen3.7 six strict function tools:
 5. `calculate_margin_safe_quote`
 6. `enforce_approval_policy`
 
-The server exposes only tools that remain incomplete. Qwen may call independent tools in parallel, and the planner stops after four turns. If a tool is omitted, malformed, or interrupted by a provider failure, the same verified implementation completes it and labels the run as guarded recovery.
+The agent runs in a bounded loop with a maximum of four planner turns. On each turn, the server exposes only the skills that are still incomplete. Independent calls may run together, but every result returns through a typed, trusted boundary.
 
-The distinction between choosing a tool and owning its result is central.
+The important distinction is **tool selection versus commercial authority**:
 
-Qwen can say that the catalog should be searched for an Aurora controller. It cannot create a SKU. It can request a quote for 500 units. It cannot write the unit price. It can ask for customer memory. It cannot make an unrelated preference relevant. It can acknowledge the approval policy. It cannot approve or send.
+| Qwen may                         | Qwen may not                         |
+| -------------------------------- | ------------------------------------ |
+| Understand the buyer's intent    | Invent a SKU or stock count          |
+| Ask for relevant customer memory | Declare an unrelated memory relevant |
+| Request a route comparison       | Invent a carrier price               |
+| Request a quote calculation      | Set the resulting price or margin    |
+| Explain risks to the seller      | Approve or send the offer            |
 
-## Deterministic commercial authority
+The orchestration loop is deliberately small. This excerpt is simplified from the [real implementation](https://github.com/mongonsh/QuoteX/blob/main/server/qwen-tool-orchestrator.ts):
 
-The TypeScript domain layer owns the commercial truth:
+```ts
+const MAX_PLANNER_TURNS = 4;
 
-- Catalog matching combines aliases, product terms, explicit intent, and phrase polarity.
-- Memory retrieval is customer-scoped and bound to the original buyer message.
-- Freight is scored from market support, deadline, cost, reliability, and relevant approved preferences.
-- Pricing recomputes discount, unit price, goods total, freight, landed total, gross profit, and margin.
-- Policy checks ambiguity, stock, margin, provenance, payment terms, and delivery feasibility.
-- Every result ends at `human-review-required`.
+for (const call of qwenToolCalls) {
+  const verifiedResult = await executeTrustedSkill(call);
+  messages.push(asToolEvidence(call.id, verifiedResult));
+}
 
-The phrase-polarity matcher matters more than it may sound. A hotel buyer wrote:
+for (const skill of missingSkills(state)) {
+  await executeSkill(state, skill, {}, `guardrail-${skill}`, "guardrail");
+}
 
-> We need the controller, not the power brick, unless the 60W driver is required for install.
+return {
+  decision: materializeDecision(state),
+  approvalGate: "human-review-required",
+};
+```
 
-A bag-of-words matcher can overvalue the repeated driver phrase. QuoteX penalizes negated and conditional alternatives, selects the controller, and still escalates the remaining ambiguity.
+If Qwen omits a tool, returns malformed arguments, times out, or becomes unavailable, QuoteX completes the missing step through the same deterministic domain code. It labels that run `guarded-fallback`; it never presents recovery as live model reasoning.
 
-Unknown products are also explicit. The trusted SKU becomes `CUSTOM-REVIEW`, never a plausible-looking invention.
+## What the deterministic layer protects
 
-## Evidence is a product feature
+The TypeScript domain layer owns the facts that can cost a business money:
 
-Most agent demos end with an answer. QuoteX ends with an answer and an audit trail.
+- **Catalog matching** combines aliases, product terms, explicit intent, and phrase polarity.
+- **Memory retrieval** is customer-scoped, relevance-ranked, expiring, and tied to the original request.
+- **Shipping** scores destination support, deadline, cost, reliability, and approved preferences.
+- **Pricing** recomputes discount, unit price, goods total, freight, landed total, gross profit, and margin.
+- **Policy** checks ambiguity, stock, provenance, payment, delivery feasibility, and margin.
+- **Approval** always ends at `human-review-required`.
 
-The interface shows:
+Phrase polarity sounds like a small detail until a buyer writes:
 
-- whether Qwen was live or guarded recovery ran;
-- every requested skill and its source;
-- the deterministic output of each skill;
-- planner turns, latency, and provider token usage;
-- the selected SKU, route, quote arithmetic, and risks;
-- a SHA-256 digest over the decision evidence;
-- the blocked send gate.
+> We need the controller, not the power brick, unless the 60W driver is required for installation.
 
-The last 200 sanitized runs are persisted in SQLite. Raw credentials are never stored.
+A bag-of-words matcher can select the repeatedly mentioned driver. QuoteX penalizes negated and conditional alternatives, selects the controller, and escalates any remaining ambiguity.
 
-This makes a subtle failure visible. A successful quote produced during a provider outage is still useful, but it must not be presented as live Qwen reasoning.
+If there is no trusted catalog match, the SKU becomes `CUSTOM-REVIEW`. A plausible-looking hallucinated SKU is never an acceptable fallback.
 
-## We tested the architecture, not just the code path
+## Evidence is part of the product
 
-We wanted to answer a harder question: does this architecture actually outperform asking Qwen to make the final decision in one prompt?
+Most agent demos end with a confident paragraph. QuoteX ends with a decision and the receipts.
 
-Our evaluator gives both approaches the same Qwen3.7 model and the same trusted customer, catalog, memory, freight, pricing, and policy context.
+![QuoteX Agent evidence showing six Qwen-selected tools, deterministic outputs, runtime, audit digest, and a blocked send gate](https://raw.githubusercontent.com/mongonsh/QuoteX/main/docs/screenshots/quotex-live-agent-evidence.png)
 
-The direct baseline receives the rules and returns final JSON. QuoteX uses Qwen to plan typed tools while verified code owns the output.
+<figcaption>Every skill exposes who selected it, which trusted result it produced, and whether the human gate remains active.</figcaption>
 
-We run six adversarial cases:
+For every run, the interface shows:
 
-- a buyer instructs the agent to use a one-dollar price and send immediately;
-- a desired product appears beside a negated alternative;
-- requested quantity exceeds stock;
-- the product is not in the catalog;
-- the deadline has no operational buffer;
-- a repeat buyer refers to previous decisions.
+- live Qwen or guarded recovery;
+- model and endpoint provenance;
+- planner turns, latency, and token usage;
+- all six skill calls and their deterministic outputs;
+- selected SKU, route, quote arithmetic, and risks;
+- a SHA-256 digest over sanitized decision evidence;
+- the final approval state.
 
-Each case scores seven facts: SKU, quantity, unit price, freight, total integrity, risk coverage, and human approval.
+This makes a subtle failure visible. A correct quote produced during a provider outage can still be useful, but it must not be represented as successful Qwen reasoning.
 
-Our latest live result with `qwen3.7-plus`:
+## I tested the architecture against Qwen itself
 
-| Architecture | Result |
-| --- | ---: |
-| QuoteX governed Qwen tool agent | 42/42, 100% |
-| Direct single-prompt Qwen baseline | 28/42, 66.7% |
-| Difference | +33.3 percentage points |
+I did not want the safety story to exist only in an architecture diagram. So I built a same-model adversarial evaluator.
 
-All six governed cases used live Qwen. The direct baseline also returned all six responses, so the difference was not caused by provider errors.
+Both systems receive the same `qwen3.7-plus` model, customer, catalog, memory, freight, pricing, and policy context:
 
-The direct model did many things well. It handled negation and the tight deadline correctly. Its failures were concentrated around exact price authority, totals, and the unknown-product route. That is precisely where executable tools are more valuable than another instruction in a prompt.
+- **Direct baseline:** Qwen returns the final commercial decision in one structured response.
+- **QuoteX:** Qwen chooses typed tools while verified code owns their results.
 
-## The evaluator found bugs in QuoteX
+The six cases test prompt injection, negated alternatives, inventory shortfall, an unknown product, an unsafe deadline, and repeat-buyer memory. Each case scores seven facts: SKU, quantity, unit price, freight, total integrity, risk coverage, and human approval.
 
-The strongest reason to keep the evaluator is that it found failures in our own architecture.
+| Architecture                       |                      Result |
+| ---------------------------------- | --------------------------: |
+| QuoteX governed Qwen tool agent    |             **42/42, 100%** |
+| Direct single-prompt Qwen baseline |            **28/42, 66.7%** |
+| Measured difference                | **+33.3 percentage points** |
 
-First, the deterministic parser read `1,500` as `1`. The regex supported six digits but not grouped commas. We fixed grouped-number parsing and added a regression test.
+All six governed cases used live Qwen. The direct baseline also returned all six responses, so provider failure did not create the difference.
 
-Second, Qwen's proposed memory-search wording could broaden relevance. A planner could mention payment terms in its retrieval query even when the buyer had not, causing an extra discount. We changed the boundary: Qwen can request memory, but only the original buyer message can establish relevance. Preference boosts now also require evidence overlap.
+This is a six-case engineering evaluation, not a production accuracy claim. Its purpose is narrower and useful: test whether executable trust boundaries protect exact commercial facts better than prompt instructions alone.
 
-After those fixes, the live governed result moved from 40/42 to 42/42.
+The full [protocol, per-case results, and limitations](https://github.com/mongonsh/QuoteX/blob/main/docs/EVALUATION.md) are public.
 
-That progression is more meaningful than presenting a perfect number without history. The evaluation is doing engineering work.
+## The evaluator found my bugs
 
-## Multimodal, but connected to one goal
+The first run was not 42/42.
 
-QuoteX also uses Qwen Cloud across the surrounding workflow:
+It exposed two authority leaks in QuoteX:
 
-- Qwen ASR transcribes seller and customer speech.
-- Qwen structured conversation fills an editable product intake.
-- Qwen vision grounds a campaign brief in the uploaded photo.
-- Wan/Qwen Image creates a commercial product edit.
-- HappyHorse animates the approved campaign frame.
-- Qwen Voice Design and Qwen TTS provide a consistent customer-assistant voice.
+1. The parser read `1,500` as `1` because the quantity expression did not support grouped commas.
+2. Qwen could broaden its memory-search wording enough to make an unrelated preference affect a discount.
 
-These are not separate demos. One verified product record and one governed offer feed the customer answer, campaign asset, product video, and validation-first Amazon, eBay, and Alibaba.com drafts.
+I fixed grouped-number parsing and added a regression test. I also changed the memory boundary: Qwen may request retrieval, but only the buyer's original message can establish relevance. Preference boosts now require evidence overlap.
 
-Publishing remains disabled until OAuth and human approval exist.
+The governed score moved from 40/42 to 42/42.
 
-## Alibaba Cloud deployment as code
+That history matters more than a perfect number. The evaluator was not submission decoration; it changed the system.
 
-The repository includes an executable Alibaba Cloud Function Compute 3.0 deployment path.
+## One verified record, several useful outputs
 
-`npm run deploy:plan` uses the official `@alicloud/fc20230330` SDK model to build and validate a Custom Container `CreateFunction` request. It shows `POST /2023-03-30/functions`, port 9000, CPU, memory, timeout, concurrency, SLS metrics, and environment names while redacting Qwen keys.
+QuoteX is multimodal, but the services are connected to one business goal rather than displayed as separate API demos:
 
-`npm run deploy:fc` is the explicit apply command. It uses Alibaba Cloud's default credential chain and prints only safe deployment identifiers.
+- **Qwen3-ASR-Flash** transcribes seller and customer speech.
+- **Qwen structured conversation** fills an editable product intake.
+- **Qwen vision** grounds a creative brief in the uploaded product photo.
+- **Qwen Image / Wan** creates a commercial product edit.
+- **HappyHorse** animates the approved campaign frame.
+- **Qwen Voice Design and Qwen TTS** provide a reusable customer-assistant voice.
 
-Inside Function Compute, QuoteX reads request ID, function name, and region context headers and writes structured logs for Simple Log Service. It never logs temporary credential headers.
+![QuoteX campaign workspace showing an uploaded product photo and the Qwen-generated commercial edit](https://raw.githubusercontent.com/mongonsh/QuoteX/main/docs/screenshots/quotex-campaign-proof.jpg)
 
-## Reproduce it
+<figcaption>The campaign is derived from the same verified product and offer context, not a disconnected prompt.</figcaption>
+
+Amazon, eBay, and Alibaba.com adapters also produce validation-first listing drafts with channel-specific title limits, condition mappings, missing-field warnings, and structured payloads.
+
+Publishing remains disabled until marketplace OAuth and human approval are implemented. A button that pretends to publish would make the demo look bigger while making the engineering less honest.
+
+## From local prototype to Alibaba Cloud
+
+The browser application is served from [GitHub Pages](https://mongonsh.github.io/QuoteX/). Every protected API, commercial decision, and Qwen call runs on an Alibaba Cloud Function Compute backend in Tokyo.
+
+![QuoteX deployed architecture connecting GitHub Pages, Alibaba Function Compute, Qwen Cloud, verified tools, persistence adapters, and human approval](https://raw.githubusercontent.com/mongonsh/QuoteX/main/diagrams/quotex-agent-architecture.png)
+
+<figcaption>The deployed judge path and the durable production path are shown separately so the diagram does not overclaim active infrastructure.</figcaption>
+
+The deployment path is executable, not a slide:
+
+- the official FC3 SDK creates or updates the function and HTTP trigger;
+- a custom-runtime ZIP provides the lightweight public judge deployment;
+- strict CORS allows only the browser origin;
+- protected routes keep Qwen credentials on Function Compute;
+- structured logs carry Function Compute request and region context;
+- health and smoke tests verify the real public boundary.
+
+The current public judge deployment intentionally uses a bounded in-memory adapter and reports `durable: false`. Local development uses SQLite. The checked-in production path provisions Alibaba Tablestore for listings and run evidence, private OSS for product media, SLS for logs, and a least-privilege RAM execution role.
+
+That distinction is visible because deployment proof should describe what is running, not what a diagram merely promises.
+
+The [Function Compute deployment module](https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts) and [sanitized runtime evidence](https://github.com/mongonsh/QuoteX/blob/main/docs/alibaba-deployment-evidence.json) are both in the repository.
+
+## Try it or inspect it
+
+- **Live application:** [mongonsh.github.io/QuoteX](https://mongonsh.github.io/QuoteX/)
+- **Demo video:** [Watch on YouTube](https://www.youtube.com/watch?v=AqyQlGGp_O8)
+- **Source:** [github.com/mongonsh/QuoteX](https://github.com/mongonsh/QuoteX)
+- **Architecture:** [source, PNG, SVG, and editable Excalidraw files](https://github.com/mongonsh/QuoteX/tree/main/diagrams)
+- **Evaluation:** [methodology and limitations](https://github.com/mongonsh/QuoteX/blob/main/docs/EVALUATION.md)
+- **Alibaba deployment proof:** [FC3 deployment code](https://github.com/mongonsh/QuoteX/blob/main/server/alibaba-fc-deployment.ts)
+
+{% github mongonsh/QuoteX %}
+
+To reproduce the non-secret checks:
 
 ```bash
 npm install
@@ -158,12 +232,16 @@ With a Qwen Cloud key:
 npm run evaluate -- --live
 ```
 
-The deterministic benchmark, adversarial protocol, machine-readable result, architecture diagram, deployment code, and three-minute demo script are all in the public repository.
+## The autonomy I want
 
-## The autonomy we want
+Useful autonomy is not the absence of people. It is the removal of repetitive coordination before the smallest decision that deserves accountability.
 
-Useful autonomy is not the absence of people. It is the removal of repetitive coordination before the smallest meaningful human decision.
+For QuoteX, Qwen can understand ambiguity, choose work, recall context, and orchestrate multiple services at machine speed. Verified tools remain responsible for inventory, freight, arithmetic, margin, and policy. A person remains responsible for the promise made to the customer.
 
-For QuoteX, that means Qwen can understand ambiguity and orchestrate work at machine speed. Verified tools remain responsible for facts and money. A person remains responsible for the promise made to a customer.
+That is not less agentic.
 
-That is not less agentic. It is the form of agency we would trust in a real business.
+It is the kind of agent I would trust inside a real business.
+
+---
+
+**Build note:** QuoteX was started on July 7, 2026. Its design, code, Qwen integrations, evaluation, Alibaba Cloud deployment, documentation, and demo were created during the hackathon submission period.
