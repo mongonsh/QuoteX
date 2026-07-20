@@ -1,15 +1,49 @@
-graph LR
-    USER[Voice text photo] --> API[Validated Node API]
-    API --> QWEN[Qwen3.7 planner]
-    QWEN -->|Strict function calls| TOOLS[Six commerce skills]
-    TOOLS --> MEMORY[Customer memory]
-    TOOLS --> CATALOG[Catalog and inventory]
-    TOOLS --> ROUTE[Freight optimizer]
-    TOOLS --> QUOTE[Margin-safe quote]
-    TOOLS --> POLICY[Risk policy]
-    POLICY --> GATE{Human approval}
-    GATE -->|Approve| OUTPUT[Offer and learned outcome]
-    GATE -->|Hold| STOP[No outbound action]
-    QWEN --> LEDGER[SQLite evidence ledger]
-    OUTPUT --> MEDIA[Qwen media and HappyHorse]
-    OUTPUT --> MARKET[Marketplace drafts]
+---
+title: QuoteX - Qwen Cloud Commerce Autopilot Architecture
+---
+flowchart TB
+    INPUT["Seller and buyer channels<br/>Voice | text | product photo"]
+    UI["QuoteX browser application<br/>GitHub Pages | responsive TypeScript UI"]
+    FC["Alibaba Cloud Function Compute<br/>Node.js API | Japan (Tokyo)<br/>Validation | auth | orchestration"]
+    QWEN["Qwen Cloud intelligence<br/>Qwen3.7-Plus | Vision | ASR<br/>Voice Design | TTS | Image | HappyHorse"]
+    SKILLS["Governed commerce agent<br/>6 typed skills: request | memory | catalog<br/>freight | pricing | risk policy"]
+    GATE{"Human approval<br/>required"}
+    OUTPUT["Review-ready business outputs<br/>Quote | campaign | voice answer<br/>Amazon | eBay | Alibaba.com drafts"]
+    BLOCK["Outbound action blocked<br/>No offer or listing sends automatically"]
+    MEMORY["Live judge persistence<br/>Bounded memory adapter<br/>Listings | memories | agent evidence"]
+    TABLE["Production data path<br/>Alibaba Tablestore<br/>Listings | memory | run ledger"]
+    OSS["Production media path<br/>Private Alibaba OSS<br/>Original and generated assets"]
+    SLS["Observability path<br/>Alibaba SLS<br/>Request | model | runtime metrics"]
+
+    INPUT --> UI
+    UI -->|"HTTPS + session access token"| FC
+    FC <-->|"OpenAI-compatible and DashScope APIs"| QWEN
+    QWEN -->|"Plans tool calls"| SKILLS
+    FC -->|"Executes trusted code"| SKILLS
+    SKILLS --> GATE
+    GATE -->|"Approved by a person"| OUTPUT
+    GATE -->|"Pending or rejected"| BLOCK
+    FC <--> MEMORY
+    FC -.->|"Durable deployment"| TABLE
+    FC -.->|"Encrypted media"| OSS
+    FC -.->|"Structured telemetry"| SLS
+
+    classDef user fill:#E8F4FF,stroke:#3B82F6,stroke-width:2px,color:#10233F;
+    classDef frontend fill:#ECFEF8,stroke:#0F9F86,stroke-width:2px,color:#073B35;
+    classDef alibaba fill:#FFF4E8,stroke:#FF6A00,stroke-width:3px,color:#4A2500;
+    classDef qwen fill:#F1EDFF,stroke:#7257E8,stroke-width:3px,color:#23194D;
+    classDef governed fill:#F5F7FA,stroke:#334155,stroke-width:2px,color:#111827;
+    classDef approval fill:#FFF8D6,stroke:#CA8A04,stroke-width:3px,color:#422006;
+    classDef output fill:#ECFDF3,stroke:#16A34A,stroke-width:2px,color:#12351F;
+    classDef blocked fill:#FFF0F1,stroke:#E5484D,stroke-width:2px,color:#4C1013;
+    classDef data fill:#F8FAFC,stroke:#64748B,stroke-width:2px,color:#172033;
+
+    class INPUT user;
+    class UI frontend;
+    class FC alibaba;
+    class QWEN qwen;
+    class SKILLS governed;
+    class GATE approval;
+    class OUTPUT output;
+    class BLOCK blocked;
+    class MEMORY,TABLE,OSS,SLS data;
