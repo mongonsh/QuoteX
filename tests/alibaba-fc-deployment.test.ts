@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildAlibabaFcDeploymentPlan,
+  classifyAlibabaFcFunctionReadiness,
   createUpdateFunctionRequest,
   createUpdateTriggerRequest,
   serializeAlibabaFcPlan
@@ -109,5 +110,29 @@ assert.equal(
   codePackagePlan.request.body?.code?.zipFile
 );
 assert.equal(updateCodeFunction.body?.customRuntimeConfig?.port, 9000);
+
+assert.equal(classifyAlibabaFcFunctionReadiness(undefined), "ready");
+assert.equal(classifyAlibabaFcFunctionReadiness({}), "ready");
+assert.equal(
+  classifyAlibabaFcFunctionReadiness({
+    state: "Active",
+    lastUpdateStatus: "Succeeded"
+  }),
+  "ready"
+);
+assert.equal(
+  classifyAlibabaFcFunctionReadiness({
+    state: "Pending",
+    lastUpdateStatus: "InProgress"
+  }),
+  "pending"
+);
+assert.equal(
+  classifyAlibabaFcFunctionReadiness({
+    state: "Active",
+    lastUpdateStatus: "Failed"
+  }),
+  "failed"
+);
 
 console.log("alibaba-fc-deployment tests passed");

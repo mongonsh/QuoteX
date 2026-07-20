@@ -546,13 +546,12 @@ async function waitForFunctionReady(
       new GetFunctionRequest({ qualifier: "LATEST" })
     );
     const current = response.body;
-    const state = current?.state?.toLowerCase() || "";
-    const updateStatus = current?.lastUpdateStatus?.toLowerCase() || "";
+    const readiness = classifyAlibabaFcFunctionReadiness(current);
 
-    if (state === "active" && (!updateStatus || updateStatus === "succeeded")) {
+    if (readiness === "ready") {
       return current;
     }
-    if (state === "failed" || updateStatus === "failed") {
+    if (readiness === "failed") {
       throw new Error(
         `Function Compute rejected ${functionName}: ${
           current?.lastUpdateStatusReason ||
@@ -568,6 +567,23 @@ async function waitForFunctionReady(
   }
 
   throw new Error(`Function Compute did not make ${functionName} active before timeout.`);
+}
+
+export function classifyAlibabaFcFunctionReadiness(
+  current:
+    | {
+        state?: string;
+        lastUpdateStatus?: string;
+      }
+    | undefined
+): "ready" | "pending" | "failed" {
+  const state = current?.state?.toLowerCase() || "";
+  const updateStatus = current?.lastUpdateStatus?.toLowerCase() || "";
+
+  if (state === "failed" || updateStatus === "failed") return "failed";
+  if (!state && !updateStatus) return "ready";
+  if (state === "active" && (!updateStatus || updateStatus === "succeeded")) return "ready";
+  return "pending";
 }
 
 function isMissingAlibabaResource(error: unknown): boolean {
